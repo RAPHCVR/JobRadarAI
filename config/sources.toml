@@ -1,0 +1,421 @@
+[run]
+max_results_per_source = 1200
+min_score = 35
+fresh_days = 21
+output_dir = "runs/latest"
+
+[public_sources]
+business_france_vie = true
+forem = true
+actiris = true
+remotive = true
+arbeitnow = true
+remoteok = true
+jobicy = true
+himalayas = true
+
+[business_france_vie]
+endpoint = "https://civiweb-api-prd.azurewebsites.net/api/Offers/search"
+scan_all = true
+query_scan = false
+page_size = 100
+max_results = 1200
+max_queries = 10
+results_per_query = 40
+queries = [
+  "Data",
+  "Data Engineer",
+  "Data Analyst",
+  "IA",
+  "AI",
+  "Machine Learning",
+  "MLOps",
+  "Python",
+  "LLM",
+  "Research"
+]
+
+[forem]
+endpoint = "https://www.odwb.be/api/explore/v2.1/catalog/datasets/offres-d-emploi-forem/records"
+max_queries = 18
+results_per_query = 60
+
+[actiris]
+endpoint = "https://www.actiris.brussels/Umbraco/api/OffersApi/GetAllOffers"
+max_queries = 18
+page_size = 20
+max_pages = 2
+
+[france_travail]
+max_queries = 22
+
+[jooble]
+max_queries = 8
+locations = ["Ireland", "Switzerland", "Belgium", "Singapore", "France", "Netherlands", "Luxembourg", "United Kingdom", "Germany"]
+
+[optional_sources]
+adzuna = true
+france_travail = true
+serpapi_google_jobs = false
+jooble = true
+jobspy_api = true
+jobspy_direct = true
+vdab_generic = false
+
+[jobspy_direct]
+max_queries = 18
+results_wanted = 12
+hours_old = 336
+sites = ["indeed"]
+include_linkedin = false
+locations = [
+  { label = "Dublin, Ireland", country_indeed = "Ireland" },
+  { label = "Zurich, Switzerland", country_indeed = "Switzerland" },
+  { label = "Geneva, Switzerland", country_indeed = "Switzerland" },
+  { label = "Brussels, Belgium", country_indeed = "Belgium" },
+  { label = "Singapore", country_indeed = "Singapore" },
+  { label = "Paris, France", country_indeed = "France" },
+  { label = "Amsterdam, Netherlands", country_indeed = "Netherlands" },
+  { label = "Luxembourg", country_indeed = "Luxembourg" },
+  { label = "London, United Kingdom", country_indeed = "UK" },
+  { label = "Berlin, Germany", country_indeed = "Germany" }
+]
+
+[[queries]]
+term = "LLM Engineer"
+priority = 10
+
+[[queries]]
+term = "Applied AI Engineer"
+priority = 10
+
+[[queries]]
+term = "GenAI Engineer"
+priority = 10
+
+[[queries]]
+term = "Ingénieur IA"
+priority = 10
+
+[[queries]]
+term = "Data Engineer"
+priority = 9
+
+[[queries]]
+term = "Ingénieur Data"
+priority = 9
+
+[[queries]]
+term = "Machine Learning Engineer"
+priority = 9
+
+[[queries]]
+term = "Data Scientist"
+priority = 8
+
+[[queries]]
+term = "MLOps Engineer"
+priority = 9
+
+[[queries]]
+term = "LLMOps Engineer"
+priority = 10
+
+[[queries]]
+term = "AI Platform Engineer"
+priority = 9
+
+[[queries]]
+term = "Research Engineer"
+priority = 8
+
+[[queries]]
+term = "NLP Engineer"
+priority = 8
+
+[[queries]]
+term = "Data Platform Engineer"
+priority = 9
+
+[[queries]]
+term = "Graduate Data Engineer"
+priority = 9
+category = "early_career"
+
+[[queries]]
+term = "Graduate AI Engineer"
+priority = 9
+category = "early_career"
+
+[[queries]]
+term = "Graduate Machine Learning Engineer"
+priority = 9
+category = "early_career"
+
+[[queries]]
+term = "Graduate Programme Data"
+priority = 8
+category = "early_career"
+
+[[queries]]
+term = "Graduate Program Data"
+priority = 8
+category = "early_career"
+
+[[queries]]
+term = "Graduate Scheme Data Science"
+priority = 8
+category = "early_career"
+
+[[queries]]
+term = "Early Careers Data"
+priority = 8
+category = "early_career"
+
+[[queries]]
+term = "Early Talent Data Engineer"
+priority = 8
+category = "early_career"
+
+[[queries]]
+term = "New Grad Software Engineer"
+priority = 8
+category = "early_career"
+
+[[queries]]
+term = "New Grad AI Engineer"
+priority = 8
+category = "early_career"
+
+[[queries]]
+term = "Campus Data Engineer"
+priority = 7
+category = "early_career"
+
+[[queries]]
+term = "Trainee Data Engineer"
+priority = 7
+category = "early_career"
+
+[[queries]]
+term = "Junior AI Engineer"
+priority = 7
+category = "early_career"
+
+[[queries]]
+term = "Junior Data Engineer"
+priority = 7
+category = "early_career"
+
+[[queries]]
+term = "Entry Level Machine Learning Engineer"
+priority = 7
+category = "early_career"
+
+[[queries]]
+term = "Associate Machine Learning Engineer"
+priority = 7
+category = "early_career"
+
+[[queries]]
+term = "Data Science Graduate Programme"
+priority = 8
+category = "early_career"
+
+[[queries]]
+term = "Analytics Graduate Programme"
+priority = 7
+category = "early_career"
+
+[[ats_feeds]]
+name = "Databricks"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/databricks/jobs?content=true"
+markets = ["ireland", "switzerland", "france", "netherlands", "uk", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "Dataiku"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/dataiku/jobs?content=true"
+markets = ["france", "ireland", "uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "Google DeepMind"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/deepmind/jobs?content=true"
+markets = ["france", "switzerland", "uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "Mistral AI"
+type = "lever"
+url = "https://api.lever.co/v0/postings/mistral?mode=json"
+markets = ["france", "uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "Contentsquare"
+type = "lever"
+url = "https://api.lever.co/v0/postings/contentsquare?mode=json"
+markets = ["france", "ireland", "uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "Intercom"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/intercom/jobs?content=true"
+markets = ["ireland", "uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "HubSpot"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/hubspot/jobs?content=true"
+markets = ["ireland", "uk", "france", "remote_europe"]
+
+[[ats_feeds]]
+name = "Adyen"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/adyen/jobs?content=true"
+markets = ["netherlands", "france", "uk", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "Stripe"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/stripe/jobs?content=true"
+markets = ["ireland", "uk", "france", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "Anthropic"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/anthropic/jobs?content=true"
+markets = ["uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "Scale AI"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/scaleai/jobs?content=true"
+markets = ["uk", "france", "remote_europe"]
+
+[[ats_feeds]]
+name = "MongoDB"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/mongodb/jobs?content=true"
+markets = ["ireland", "france", "uk", "germany", "netherlands", "switzerland", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "Celonis"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/celonis/jobs?content=true"
+markets = ["germany", "uk", "france", "netherlands", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "N26"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/n26/jobs?content=true"
+markets = ["germany", "france", "uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "Canonical"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/canonical/jobs?content=true"
+markets = ["ireland", "france", "uk", "germany", "netherlands", "switzerland", "belgium", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "GitLab"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true"
+markets = ["ireland", "france", "uk", "germany", "netherlands", "switzerland", "belgium", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "Elastic"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/elastic/jobs?content=true"
+markets = ["ireland", "france", "uk", "germany", "netherlands", "switzerland", "belgium", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "OpenAI"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/openai?includeCompensation=true"
+timeout = 90
+markets = ["ireland", "france", "uk", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "LangChain"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/langchain?includeCompensation=true"
+markets = ["uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "Perplexity AI"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/perplexity?includeCompensation=true"
+markets = ["uk", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "Cursor"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/cursor?includeCompensation=true"
+markets = ["uk", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "Snowflake"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/snowflake?includeCompensation=true"
+markets = ["ireland", "france", "uk", "germany", "netherlands", "switzerland", "belgium", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "Datadog"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/datadog/jobs?content=true"
+markets = ["ireland", "france", "uk", "germany", "netherlands", "switzerland", "singapore", "remote_europe"]
+
+[[ats_feeds]]
+name = "Algolia"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/algolia/jobs?content=true"
+markets = ["france", "uk", "germany", "remote_europe"]
+
+[[ats_feeds]]
+name = "Qonto"
+type = "lever"
+url = "https://api.lever.co/v0/postings/qonto?mode=json"
+markets = ["france", "germany", "remote_europe"]
+
+[[ats_feeds]]
+name = "Pigment"
+type = "lever"
+url = "https://api.lever.co/v0/postings/pigment?mode=json"
+markets = ["france", "uk", "netherlands", "remote_europe"]
+
+[[ats_feeds]]
+name = "Cohere"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/cohere?includeCompensation=true"
+markets = ["uk", "france", "ireland", "remote_europe"]
+
+[[ats_feeds]]
+name = "ElevenLabs"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/elevenlabs?includeCompensation=true"
+markets = ["uk", "france", "germany", "remote_europe"]
+
+[[ats_feeds]]
+name = "Synthesia"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/synthesia?includeCompensation=true"
+markets = ["uk", "france", "germany", "remote_europe"]
+
+[[ats_feeds]]
+name = "Stability AI"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/stabilityai/jobs?content=true"
+markets = ["uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "Modal"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/modal?includeCompensation=true"
+markets = ["uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "Poolside"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/poolside?includeCompensation=true"
+markets = ["france", "remote_europe"]

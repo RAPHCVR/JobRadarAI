@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jobradai"
+version = "0.1.0"
+description = "Autonomous job intelligence pipeline for data, AI, LLM orchestration and research roles."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Raphael" }]
+license = { text = "Private" }
+dependencies = []
+
+[project.scripts]
+jobradai = "jobradai.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

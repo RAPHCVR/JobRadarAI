@@ -1,0 +1,109 @@
+[markets.ireland]
+label = "Ireland"
+aliases = ["ireland", "dublin", "cork", "galway", "limerick"]
+market_score = 95
+practicality_score = 76
+salary_score = 82
+visa_score = 92
+language_score = 98
+notes = "Cible principale: anglophone, EU, forte demande data/AI, Dublin tres pertinent."
+
+[markets.switzerland]
+label = "Switzerland"
+aliases = ["switzerland", "schweiz", "suisse", "zurich", "geneva", "lausanne", "basel", "bern", "zug"]
+market_score = 86
+practicality_score = 84
+salary_score = 98
+visa_score = 62
+language_score = 78
+notes = "Premium salaire, volume plus faible, marche selectif, permis a verifier hors frontalier."
+
+[markets.belgium]
+label = "Belgium"
+aliases = ["belgium", "belgique", "brussels", "bruxelles", "leuven", "ghent", "gent", "antwerp", "anvers"]
+market_score = 78
+practicality_score = 82
+salary_score = 72
+visa_score = 94
+language_score = 82
+notes = "Bon compromis UE/francais-anglais, Bruxelles/institutions/consulting/pharma/finance."
+
+[markets.singapore]
+label = "Singapore"
+aliases = ["singapore"]
+market_score = 84
+practicality_score = 74
+salary_score = 86
+visa_score = 54
+language_score = 94
+notes = "Tres bon marche AI/data anglophone, mais visa/relocation et concurrence a traiter comme opportunite."
+
+[markets.france]
+label = "France"
+aliases = ["france", "paris", "lyon", "toulouse", "nantes", "lille", "grenoble", "rennes", "bordeaux"]
+market_score = 82
+practicality_score = 86
+salary_score = 64
+visa_score = 100
+language_score = 100
+notes = "Stable et proche, tres bon pour GenAI/LLMOps/Data Platform, salaires souvent moins hauts."
+
+[markets.netherlands]
+label = "Netherlands"
+aliases = ["netherlands", "amsterdam", "rotterdam", "utrecht", "eindhoven"]
+market_score = 82
+practicality_score = 79
+salary_score = 78
+visa_score = 92
+language_score = 92
+notes = "Tres bon anglophone Europe, fort volume tech/data, a garder en extension."
+
+[markets.luxembourg]
+label = "Luxembourg"
+aliases = ["luxembourg"]
+market_score = 75
+practicality_score = 82
+salary_score = 84
+visa_score = 96
+language_score = 88
+notes = "Petit volume, bon pour finance/data/IA, francais-anglais utile."
+
+[markets.uk]
+label = "United Kingdom"
+aliases = ["united kingdom", "uk", "london", "manchester", "cambridge", "oxford"]
+market_score = 88
+practicality_score = 72
+salary_score = 86
+visa_score = 48
+language_score = 98
+notes = "Tres fort AI/data mais visa hors UE."
+
+[markets.germany]
+label = "Germany"
+aliases = ["germany", "berlin", "munich", "muenchen", "hamburg", "frankfurt"]
+market_score = 80
+practicality_score = 78
+salary_score = 76
+visa_score = 92
+language_score = 70
+notes = "Gros volume, langue variable selon entreprise/ville."
+
+[markets.remote_europe]
+label = "Remote Europe"
+aliases = ["remote", "europe", "emea", "worldwide", "anywhere"]
+market_score = 80
+practicality_score = 88
+salary_score = 76
+visa_score = 86
+language_score = 92
+notes = "Bon levier si contrat clair, salaire et fiscalite a filtrer strictement."
+
+[markets.other]
+label = "Other / hors cible"
+aliases = []
+market_score = 20
+practicality_score = 20
+salary_score = 30
+visa_score = 20
+language_score = 40
+notes = "Hors France/Europe/Singapour cible, garde seulement si ajoute explicitement."

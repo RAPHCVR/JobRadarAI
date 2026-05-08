@@ -1,0 +1,202 @@
+[profile]
+headline = "Data / AI / LLM orchestration engineer, research-oriented"
+summary = "Data/AI products end-to-end: ML/LLM/RAG, evaluation, APIs/backend, MLOps/DevOps, observability and research-oriented engineering. Current research internship: AI mechanistic explainability/interpretability at Aubay."
+languages = ["French", "English"]
+eu_citizen = true
+remote_preference = "hybrid_or_remote"
+current_location = "Boulogne-Billancourt, France"
+cv_source = "private/main.tex"
+current_research_focus = "mechanistic explainability / interpretability of AI"
+
+[career]
+target_level = "new_grad_to_mid"
+entry_level_allowed = true
+senior_allowed_if_strong_fit = true
+current_status = "junior / new-grad profile, final-year computer engineering student, current AI Researcher internship at Aubay"
+
+[current_experience]
+company = "Aubay"
+role = "AI Researcher Intern"
+location = "Boulogne-Billancourt / Paris, France"
+start = "2026-02"
+end = "2026-07"
+duration_months = 6
+focus = "mechanistic explainability / interpretability of AI"
+use_for_level_calibration = true
+
+[constraints]
+minimum_annual_salary_eur = 45000
+vie_allowed = true
+vie_minimum_monthly_allowance_eur = 1800
+minimum_remote_days_per_week = 2
+remote_requirement = "hybrid_min_2_days_or_remote"
+target_start_after = "2026-08"
+availability_note = "Stage AI Researcher Aubay jusqu'en juillet 2026; disponibilite cible aout/septembre 2026."
+prefer_major_city = true
+base_city = "Boulogne-Billancourt"
+major_cities = [
+  "Paris",
+  "Boulogne-Billancourt",
+  "Dublin",
+  "London",
+  "Zurich",
+  "Geneva",
+  "Lausanne",
+  "Basel",
+  "Brussels",
+  "Amsterdam",
+  "Berlin",
+  "Munich",
+  "Singapore",
+  "Luxembourg",
+  "Lyon",
+  "Toulouse",
+  "Nantes",
+  "Lille",
+  "Grenoble",
+  "Bordeaux"
+]
+
+[search]
+target_markets = ["ireland", "switzerland", "belgium", "singapore", "france", "netherlands", "luxembourg", "uk", "germany", "remote_europe"]
+primary_locations = ["Dublin", "Ireland", "Zurich", "Geneva", "Lausanne", "Basel", "Brussels", "Belgium", "Singapore", "Paris", "France", "Amsterdam", "Luxembourg", "London"]
+titles = [
+  "Senior Data Engineer",
+  "Data Engineer",
+  "Graduate Data Engineer",
+  "Junior Data Engineer",
+  "AI Engineer",
+  "Graduate AI Engineer",
+  "Junior AI Engineer",
+  "Applied AI Engineer",
+  "GenAI Engineer",
+  "LLM Engineer",
+  "LLMOps Engineer",
+  "MLOps Engineer",
+  "ML Platform Engineer",
+  "AI Platform Engineer",
+  "Data Platform Engineer",
+  "Research Engineer",
+  "AI Research Engineer",
+  "Interpretability Engineer",
+  "Explainability Engineer",
+  "AI Safety Engineer",
+  "Machine Learning Engineer",
+  "Graduate Machine Learning Engineer",
+  "Entry Level Machine Learning Engineer",
+  "ML Engineer",
+  "Junior Machine Learning Engineer",
+  "New Grad Software Engineer",
+  "New Grad AI Engineer",
+  "Early Careers Data",
+  "Trainee Data Engineer",
+  "Associate Data Engineer",
+  "Associate Software Engineer",
+  "Associate Machine Learning Engineer",
+  "Backend AI Engineer",
+  "LLM Application Engineer",
+  "Forward Deployed AI Engineer",
+  "Platform Engineer",
+  "NLP Engineer",
+  "Data Architect",
+  "Analytics Engineer"
+]
+
+[weights.must_have]
+python = 9
+sql = 8
+data_engineering = 10
+llm = 10
+rag = 10
+mlops = 9
+llmops = 10
+orchestration = 9
+agents = 8
+research = 7
+mechanistic_interpretability = 10
+explainability = 9
+ai_safety = 7
+cloud = 8
+kubernetes = 7
+aks = 8
+helm = 7
+keda = 6
+airflow = 7
+dagster = 7
+spark = 8
+databricks = 8
+snowflake = 7
+dbt = 7
+fastapi = 6
+langchain = 7
+langgraph = 8
+llamaindex = 6
+vector_database = 7
+evaluation = 8
+observability = 7
+governance = 6
+langfuse = 7
+opentelemetry = 7
+prometheus = 6
+grafana = 6
+knowledge_graph = 7
+sparql = 7
+rdf = 6
+owl = 6
+time_series = 7
+anomaly_detection = 7
+root_cause_analysis = 7
+
+[weights.good_signals]
+production = 8
+platform = 8
+distributed_systems = 7
+retrieval = 8
+applied_research = 8
+nlp = 7
+information_retrieval = 7
+automation = 6
+data_quality = 6
+streaming = 7
+kafka = 7
+lakehouse = 6
+azure = 8
+aws = 6
+gcp = 6
+bedrock = 6
+vertex = 6
+openai = 6
+anthropic = 6
+azure_devops = 6
+github_actions = 5
+document_intelligence = 5
+websockets = 5
+streamlit = 4
+postgresql = 5
+sqlite = 3
+ragas = 6
+early_career = 5
+graduate_program = 6
+new_grad = 6
+campus_hiring = 4
+
+[weights.negative_signals]
+intern = -30
+apprenticeship = -22
+graduate = 0
+junior = 0
+sales_only = -14
+prompt_engineer_only = -12
+growth_hacking = -12
+crypto_only = -8
+unpaid = -50
+product_manager = -22
+program_manager = -18
+account_executive = -30
+account_manager = -24
+business_development = -30
+customer_success = -24
+marketing = -24
+recruiter = -28
+solution_engineer = -16
+support_engineer = -16
