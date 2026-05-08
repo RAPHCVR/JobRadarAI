@@ -58,7 +58,8 @@ Les requetes globales incluent maintenant une couche dediee graduate/new-grad/ca
 
 - Greenhouse: Databricks, Dataiku, Google DeepMind, Intercom, Adyen, Stripe, Anthropic, Scale AI, MongoDB, Celonis, N26, Canonical, GitLab, Elastic, Datadog, Algolia, Stability AI.
 - Lever: Mistral AI, Contentsquare, Qonto, Pigment.
-- Ashby: OpenAI, LangChain, Perplexity AI, Cursor, Snowflake, Cohere, ElevenLabs, Synthesia, Modal, Poolside.
+- Ashby: OpenAI, LangChain, Perplexity AI, Cursor, Snowflake, Cohere, ElevenLabs, Synthesia, Modal, Poolside, H Company, Dust, Qdrant, Nabla.
+- Greenhouse additionnel: Doctolib.
 
 OpenAI a un `timeout = 90` dans `config/sources.toml`, car son feed Ashby officiel est volumineux et peut repondre au-dela du timeout HTTP global.
 

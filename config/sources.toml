@@ -419,3 +419,33 @@ name = "Poolside"
 type = "ashby"
 url = "https://api.ashbyhq.com/posting-api/job-board/poolside?includeCompensation=true"
 markets = ["france", "remote_europe"]
+
+[[ats_feeds]]
+name = "H Company"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/hcompany?includeCompensation=true"
+markets = ["france", "uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "Dust"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/dust?includeCompensation=true"
+markets = ["france", "uk", "remote_europe"]
+
+[[ats_feeds]]
+name = "Qdrant"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/qdrant.tech?includeCompensation=true"
+markets = ["germany", "netherlands", "uk", "france", "remote_europe"]
+
+[[ats_feeds]]
+name = "Nabla"
+type = "ashby"
+url = "https://api.ashbyhq.com/posting-api/job-board/nabla?includeCompensation=true"
+markets = ["france", "remote_europe"]
+
+[[ats_feeds]]
+name = "Doctolib"
+type = "greenhouse"
+url = "https://boards-api.greenhouse.io/v1/boards/doctolib/jobs?content=true"
+markets = ["france", "germany", "remote_europe"]

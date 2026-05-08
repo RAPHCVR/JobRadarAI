@@ -45,7 +45,7 @@ Fonctionne sans cle API:
 - RemoteOK.
 - Jobicy.
 - Himalayas.
-- ATS directs verifies: Databricks, Dataiku, Google DeepMind, Mistral AI, Contentsquare, Intercom, Adyen, Stripe, Anthropic, Scale AI, MongoDB, Celonis, N26, Canonical, GitLab, Elastic, OpenAI, LangChain, Perplexity AI, Cursor, Snowflake, Datadog, Algolia, Qonto, Pigment, Cohere, ElevenLabs, Synthesia, Stability AI, Modal, Poolside.
+- ATS directs verifies: Databricks, Dataiku, Google DeepMind, Mistral AI, Contentsquare, Intercom, Adyen, Stripe, Anthropic, Scale AI, MongoDB, Celonis, N26, Canonical, GitLab, Elastic, OpenAI, LangChain, Perplexity AI, Cursor, Snowflake, Datadog, Algolia, Qonto, Pigment, Cohere, ElevenLabs, Synthesia, Stability AI, Modal, Poolside, H Company, Dust, Qdrant, Nabla, Doctolib.
 - JobSpy Direct via `uv`, sur Indeed par defaut, sans LinkedIn.
 
 Actif avec credentials locaux:
