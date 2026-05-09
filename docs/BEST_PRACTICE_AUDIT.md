@@ -13,6 +13,8 @@ Le bon design pour ce besoin est un radar local multi-sources avec priorite aux 
 
 Le projet suit ce modele. Il est utilisable en routine manuelle ou quotidienne desactivee/reactivable, avec exports HTML/Markdown/CSV/JSON/SQLite, logs, audit marche/VIE/langues, judge LLM, verification liens, registre multi-run et snapshots historiques.
 
+Une interface web privee est aussi deployee sous `https://jobs.raphcvr.me` pour piloter la queue depuis desktop/mobile: image GHCR, pod Kubernetes non-root, PVC Longhorn pour `runs/`, auth par cookie signe et aucun secret ou run bake dans l'image.
+
 ## Etat Runtime Valide
 
 Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
@@ -29,6 +31,7 @@ Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
 - Queue dedupee: `runs/latest/application_queue.md`, 181 items apres durcissement `too_senior`/signaux structures.
 - Historique: 674 nouvelles offres, 1 revenue, 1184 absentes marquees `stale`, 0 `expired`.
 - P0: aucun blocage runtime detecte.
+- Plateforme web: `jobradarai-web` Running 1/1 sur Kubernetes, ingress `jobs.raphcvr.me`, login HTTPS OK, queue `181`, CV PDF disponible.
 
 ## Repos Et Systemes Audites
 
@@ -98,6 +101,8 @@ Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
 - Les exports CSV neutralisent les formules Excel et le dashboard n'accepte que des liens HTTP(S).
 - Les erreurs HTTP redigent secrets en query/path/body.
 - LinkedIn non automatise en masse.
+- Plateforme web protegee par `JOBRADAR_WEB_PASSWORD`, cookie `HttpOnly`/`SameSite=Lax`/`Secure`, session signee, secret Kubernetes, root filesystem read-only, service account token desactive.
+- L'image Docker exclut `runs/`, `private/` et `config/.env`; les donnees live sont synchronisees vers le PVC par `scripts/sync_web_data.ps1`.
 
 ## Reste A Faire
 
@@ -109,6 +114,7 @@ Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
 - `P2`: traiter `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux de tri et de verification; `too_senior` doit rester hors queue actionnable sauf override LLM junior/all-levels explicite.
 - `P2/P3`: surveiller sur les prochains runs le bruit apporte par `Analytics Engineer` et `Applied Scientist`; le premier full run post-extension est correct, mais ces titres doivent rester sous garde-fous niveau/experience.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
+- `P2`: apres chaque gros run local, synchroniser la plateforme web avec `scripts/sync_web_data.ps1`; ne copier `runs/state/application_state.json` qu'en migration explicite.
 - `P3`: demarrer `rainmanjam/jobspy-api` en Docker seulement si tu veux une API JobSpy permanente au lieu du mode uv direct; le mode direct est maintenant timeout-borne.
 - `P3`: DevITJobs-like/Wellfound/ABG/Campus France Doctorat/DAAD restent des tests ponctuels possibles, mais ne sont pas prioritaires apres l'ajout EURAXESS + Doctorat.gouv.fr + AcademicTransfer + RSS tech.
 - `PN`: VDAB direct, SerpAPI, Glassdoor JobSpy, ANRT sans compte, EURES API, JobsIreland API et Veolia large ne sont plus des pistes actives. On les garde hors scope tant que l'acces/ratio signal-bruit ne change pas.

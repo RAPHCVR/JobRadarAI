@@ -1,6 +1,8 @@
 # Etat Courant
 
-Derniere validation: **2026-05-09 19:59 Europe/Paris**, full run large manuel `20260509-192018` apres audit, nettoyage, durcissement JobSpy Direct, extension sources/geographies, extension titres et garde-fous experience.
+Derniere validation run: **2026-05-09 19:59 Europe/Paris**, full run large manuel `20260509-192018` apres audit, nettoyage, durcissement JobSpy Direct, extension sources/geographies, extension titres et garde-fous experience.
+
+Derniere validation plateforme web: **2026-05-09 23:03 Europe/Paris**, deployee sur Kubernetes sous `https://jobs.raphcvr.me`.
 
 Commande utilisee pour la base large:
 
@@ -32,6 +34,8 @@ Commande utilisee pour la base large:
 - Registre multi-run: `runs/history/job_history.sqlite`.
 - Logs: `runs/logs/`.
 - Tache Windows: `JobRadarAI-Daily` **desactivee**. Aucun run automatique ne doit partir tant que la tache reste `Disabled`.
+- Plateforme web: pod `jobradarai-web` **Running 1/1**, ingress `jobs.raphcvr.me`, PVC Longhorn `jobradarai-data` 5Gi, auth active.
+- Smoke web HTTPS: `/api/health` OK, login OK, `run_name=20260509-192018`, `queue_count=181`, CV PDF disponible.
 
 Exports principaux:
 
@@ -190,10 +194,14 @@ Verdict: la couche marche et reste correctement secondaire. Elle capture les gra
 - Queue et audit regeneres apres ce garde-fou: **181** items, **0** `experience_check=too_senior` dans la queue.
 - Extension des titres/requetes: `ML Engineer`, `AI/ML Engineer`, `ML Ops Engineer`, `AI Research Engineer`, `LLM Research Engineer`, `LLM Application Engineer`, `Analytics Engineer` et veille niche `Applied Scientist`/interpretability/explainability/AI safety/knowledge graph/semantic web. Le run `20260509-192018` confirme un signal utile sans explosion de bruit.
 - Workspace nettoye puis pousse sur GitHub.
+- Interface web React/Vite + shadcn-style ajoutee, dockerisee, publiee via GHCR, deployee sur Kubernetes et synchronisee avec `runs/latest`.
+- CV PDF genere localement apres installation des paquets TinyTeX manquants (`babel-french`, `fontawesome5`) puis monte dans le PVC web.
+- Secret web initial cree dans Kubernetes; copie locale ignoree par Git dans `runs/state/web_initial_credentials.txt`.
 
 ## P0 A PN
 
 - `P0`: aucun blocage runtime detecte sur le dernier run.
+- `P0`: plateforme web deployee et smoke HTTPS OK.
 - `P1`: ouvrir manuellement les **91** liens `browser_required` avant candidature.
 - `P1`: verifier manuellement les **15** liens `needs_review` avant candidature.
 - `P1`: verifier salaire et remote quand l'offre ou le judge LLM marquent `unknown`/`weak`.
@@ -201,6 +209,7 @@ Verdict: la couche marche et reste correctement secondaire. Elle capture les gra
 - `P2`: utiliser `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux soft. Les hard filters legitimes restent: remote explicitement incompatible, langue locale obligatoire non compensee par un fit tres fort, ou niveau/experience `too_senior` sans signal junior/all-levels explicite.
 - `P2/P3`: verifier le bruit des nouveaux titres au prochain run, surtout `Analytics Engineer` et `Applied Scientist`; conserver si le score et le judge remontent bien des roles data/AI/platform/research, pas BI reporting ou research senior hors cible.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
+- `P2`: quand un nouveau run est genere localement, lancer `scripts/sync_web_data.ps1` pour rafraichir la plateforme; ne pas copier `runs/state` sauf migration volontaire des statuts.
 - `P3`: JobSpy API Docker seulement si tu veux une API locale permanente; le mode uv direct suffit aujourd'hui et est timeout-borne.
 - `P3`: WTTJ, DevITJobs-like, Wellfound, ABG, Campus France Doctorat, DAAD/PhDGermany, ETH/EPFL restent des tests ponctuels possibles, pas des manques bloquants du systeme actuel.
 - `PN`: VDAB direct, SerpAPI, Glassdoor JobSpy, ANRT sans compte, EURES API, JobsIreland API, Veolia large et LinkedIn automation sont hors scope routine.
