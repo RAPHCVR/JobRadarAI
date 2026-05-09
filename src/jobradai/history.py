@@ -444,13 +444,15 @@ def _queue_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
           END,
           score DESC,
           last_seen DESC
-        LIMIT 300
+        LIMIT 600
         """
     ).fetchall()
     items: list[dict[str, Any]] = []
     for row in rows:
         item = dict(row)
         job_payload = _payload_dict(item.get("payload_json"))
+        if _deterministic_experience_too_senior(item, job_payload):
+            continue
         early_signal = early_career_signal(job_payload or item)
         item["early_career_fit"] = early_signal.get("early_career_fit", "none")
         item["early_career_structured"] = bool(early_signal.get("structured_program"))
@@ -474,7 +476,15 @@ def _queue_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             item["last_recruiter_message"] = build_recruiter_message(item)
         item.pop("payload_json", None)
         items.append(item)
+        if len(items) >= 300:
+            break
     return items
+
+
+def _deterministic_experience_too_senior(item: dict[str, Any], job_payload: dict[str, Any]) -> bool:
+    if str(item.get("last_level_fit") or "") == "junior_ok":
+        return False
+    return str(job_payload.get("experience_check") or "").strip().lower() == "too_senior"
 
 
 def _queue_markdown(result: dict[str, Any]) -> str:

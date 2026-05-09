@@ -30,7 +30,7 @@ Dernier full run valide documente: **2026-05-09 16:43 Europe/Paris**.
 - 532 missions VIE Business France.
 - 200 offres jugees par le LLM en mode `balanced`.
 - 236 liens verifies en mode priority-aware.
-- 177 items dans la queue multi-run dedupee.
+- 176 items dans la queue multi-run dedupee.
 - Tache Windows `JobRadarAI-Daily`: **desactivee**.
 
 Le full run inclut les extensions ajoutees pendant l'audit: Bundesagentur Jobsuche, SmartRecruiters durci, Delivery Hero filtre, correction du matching marche par alias bornes, JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS, Doctorat.gouv.fr, AcademicTransfer, WeWorkRemotely RSS, SwissDevJobs, GermanTechJobs, champs structures `deadline`/`language_check`/`remote_location_validity`/`required_years`/`experience_check`/salaire annualise EUR, extension graduate/early-career/doctorat industriel-CIFRE, et extension opportuniste Autriche/Nordics/Espagne/Portugal/Estonie/Pologne/Tchequie.
@@ -92,6 +92,6 @@ Voir [docs/SOURCES.md](docs/SOURCES.md) pour le detail.
 - Les sources officielles/ATS priment sur les scrapers.
 - Les exports gardent les raisons de scoring.
 - `start_date_check` reste un signal soft: confirmer avec RH, ne pas auto-skipper.
-- `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et la normalisation devise/salaire sont des signaux de priorisation, pas des hard filters aveugles.
+- `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et la normalisation devise/salaire sont des signaux de priorisation, pas des hard filters aveugles; seul `experience_check=too_senior` deterministe sort de la queue actionnable sauf override LLM `junior_ok`.
 - Les offres PhD/doctorat sont opportunistes: un CIFRE/industrial PhD data/AI/R&D peut etre shortlist, mais un doctorat academique sans entreprise, salaire ou fit technique clair reste a verifier ou low-fit.
 - Le judge LLM aide a prioriser, mais ne remplace pas la verification humaine avant candidature.

@@ -185,6 +185,105 @@ class HistoryTests(unittest.TestCase):
             result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
             self.assertFalse(any(item["stable_id"] == job["stable_id"] for item in result["items"]))
 
+    def test_sync_history_excludes_deterministic_too_senior_items_from_queue(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "latest"
+            output.mkdir()
+            history_db = root / "history" / "job_history.sqlite"
+            job = Job(
+                source="ATS",
+                source_type="ats",
+                title="Applied AI Engineer",
+                company="Acme",
+                url="https://jobs.example.com/applied-ai",
+                market="france",
+                score=86,
+                required_years=7,
+                experience_check="too_senior",
+                experience_evidence="7 years of professional experience",
+            ).as_dict()
+            self._write_run(
+                output,
+                [job],
+                shortlist_items=[
+                    {
+                        "stable_id": job["stable_id"],
+                        "priority": "shortlist",
+                        "level_fit": "stretch",
+                        "combined_score": 88,
+                    }
+                ],
+            )
+            result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
+            self.assertFalse(any(item["stable_id"] == job["stable_id"] for item in result["items"]))
+
+    def test_sync_history_keeps_stretch_items_with_moderate_required_years(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "latest"
+            output.mkdir()
+            history_db = root / "history" / "job_history.sqlite"
+            job = Job(
+                source="ATS",
+                source_type="ats",
+                title="Data Engineer II",
+                company="Acme",
+                url="https://jobs.example.com/data-ii",
+                market="france",
+                score=80,
+                required_years=3,
+                experience_check="stretch",
+                experience_evidence="3 years experience",
+            ).as_dict()
+            self._write_run(
+                output,
+                [job],
+                shortlist_items=[
+                    {
+                        "stable_id": job["stable_id"],
+                        "priority": "shortlist",
+                        "level_fit": "stretch",
+                        "combined_score": 82,
+                    }
+                ],
+            )
+            result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
+            self.assertTrue(any(item["stable_id"] == job["stable_id"] for item in result["items"]))
+
+    def test_sync_history_keeps_too_senior_when_llm_marks_junior_ok(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "latest"
+            output.mkdir()
+            history_db = root / "history" / "job_history.sqlite"
+            job = Job(
+                source="ATS",
+                source_type="ats",
+                title="AI Engineer All Levels",
+                company="Acme",
+                url="https://jobs.example.com/ai-all-levels",
+                market="france",
+                score=84,
+                required_years=5,
+                experience_check="too_senior",
+                experience_evidence="5 years experience",
+            ).as_dict()
+            self._write_run(
+                output,
+                [job],
+                shortlist_items=[
+                    {
+                        "stable_id": job["stable_id"],
+                        "priority": "shortlist",
+                        "level_fit": "junior_ok",
+                        "combined_score": 86,
+                    }
+                ],
+            )
+            result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
+            self.assertTrue(any(item["stable_id"] == job["stable_id"] for item in result["items"]))
+
     def _write_run(self, output: Path, jobs: list[dict], shortlist_items: list[dict]) -> None:
         (output / "jobs.json").write_text(json.dumps(jobs, ensure_ascii=False), encoding="utf-8")
         (output / "llm_shortlist.json").write_text(

@@ -29,7 +29,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/run_daily.ps1 `
 - VIE Business France retenus: **532**.
 - Judge LLM: **200** offres jugees en mode `balanced`, effort `medium`, batchs de 5.
 - Verification liens: **236** liens verifies.
-- Queue multi-run: **177** items dedupes.
+- Queue multi-run: **176** items dedupes.
 - Snapshot final: `runs/history/20260509-160240`.
 - Registre multi-run: `runs/history/job_history.sqlite`.
 - Logs: `runs/logs/`.
@@ -129,20 +129,20 @@ Top `apply_now` du run:
 
 ## Queue Multi-Run
 
-- Queue dedupee: **177**.
-- Statuts: **170** `active`, **7** `stale`, **0** `expired` dans la queue.
-- Priorites queue: **13** `apply_now`, **104** `shortlist`, **4** `high_score`, **56** `maybe`.
+- Queue dedupee: **176**.
+- Statuts: **169** `active`, **7** `stale`, **0** `expired` dans la queue.
+- Priorites queue: **13** `apply_now`, **103** `shortlist`, **4** `high_score`, **56** `maybe`.
 - Historique global: **4815** offres actives, **671** offres `stale`, **0** `expired`.
 - Deltas vs run precedent `20260508-204629-expanded`: **2233** nouvelles offres, **3** revenus, **671** absentes ce run.
 
 Checks queue:
 
-- `start_date_check`: 120 `unknown`, 46 `too_soon`, 11 `compatible`.
-- Salaire: 102 `meets_or_likely`, 44 `unknown`, 31 `below_min`.
-- Remote: 58 `meets`, 116 `weak`, 3 `unknown`.
-- Langue: 26 `english_ok`, 12 `french_ok`, 2 `local_language_required`, 137 `unknown`.
-- Remote/localisation: 175 `compatible`, 1 `restricted`, 1 `unknown`.
-- Niveau: 85 `junior_ok`, 81 `stretch`, 8 `unknown`; les `too_senior` ne restent pas dans la queue actionnable.
+- `start_date_check`: 119 `unknown`, 46 `too_soon`, 11 `compatible`.
+- Salaire: 102 `meets_or_likely`, 44 `unknown`, 30 `below_min`.
+- Remote: 58 `meets`, 115 `weak`, 3 `unknown`.
+- Langue: 26 `english_ok`, 12 `french_ok`, 2 `local_language_required`, 136 `unknown`.
+- Remote/localisation: 174 `compatible`, 1 `restricted`, 1 `unknown`.
+- Niveau: 85 `junior_ok`, 80 `stretch`, 8 `unknown`; les `too_senior` LLM ou deterministes ne restent pas dans la queue actionnable.
 
 ## Liens
 
@@ -186,6 +186,8 @@ Verdict: la couche marche et reste correctement secondaire. Elle capture les gra
 - Tests ajoutes pour verifier que `_run_text_command` capture bien stdout/stderr et rend la main apres timeout.
 - Full run large relance et termine sans erreur source.
 - Documentation vivante remise a jour sur le run `20260509-160240`.
+- Garde-fou ajoute: une offre avec `experience_check=too_senior` deterministe sort de la queue actionnable sauf override LLM `junior_ok`; les cas `stretch` 2-4 ans restent visibles.
+- Queue et audit regeneres apres ce garde-fou: **176** items, **0** `experience_check=too_senior` dans la queue.
 - Workspace nettoye puis pousse sur GitHub.
 
 ## P0 A PN
@@ -195,7 +197,7 @@ Verdict: la couche marche et reste correctement secondaire. Elle capture les gra
 - `P1`: verifier manuellement les **15** liens `needs_review` avant candidature.
 - `P1`: verifier salaire et remote quand l'offre ou le judge LLM marquent `unknown`/`weak`.
 - `P2`: utiliser `start_date_check` comme signal soft et confirmer avec RH les dates `unknown`/`too_soon`; ne pas auto-skipper.
-- `P2`: utiliser `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux soft. Les hard filters legitimes restent: remote explicitement incompatible, langue locale obligatoire non compensee par un fit tres fort, ou niveau `too_senior` sans signal junior/all-levels explicite.
+- `P2`: utiliser `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux soft. Les hard filters legitimes restent: remote explicitement incompatible, langue locale obligatoire non compensee par un fit tres fort, ou niveau/experience `too_senior` sans signal junior/all-levels explicite.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
 - `P3`: JobSpy API Docker seulement si tu veux une API locale permanente; le mode uv direct suffit aujourd'hui et est timeout-borne.
 - `P3`: WTTJ, DevITJobs-like, Wellfound, ABG, Campus France Doctorat, DAAD/PhDGermany, ETH/EPFL restent des tests ponctuels possibles, pas des manques bloquants du systeme actuel.
