@@ -19,6 +19,7 @@ Le projet est volontairement local et humain-dans-la-boucle:
 - Sources actives, sources bloquees, ATS et backlog d'extensions: [docs/SOURCES.md](docs/SOURCES.md).
 - Strategie marche, titres et signaux de scoring: [docs/MARKET_STRATEGY.md](docs/MARKET_STRATEGY.md).
 - Audit best-practice et garde-fous systeme: [docs/BEST_PRACTICE_AUDIT.md](docs/BEST_PRACTICE_AUDIT.md).
+- Plateforme web hebergee Kubernetes: [docs/WEB_PLATFORM.md](docs/WEB_PLATFORM.md).
 - Index complet des docs: [docs/README.md](docs/README.md).
 
 ## Etat Court
@@ -66,6 +67,31 @@ cd C:\Users\Raphael\Documents\JobRadarAI
 $env:PYTHONPATH = "src"
 uv run --no-project --with-editable . -- python -m unittest discover -s tests
 ```
+
+## Interface Web
+
+Interface privee mobile/desktop: `https://jobs.raphcvr.me` une fois deployee.
+
+Local:
+
+```powershell
+cd C:\Users\Raphael\Documents\JobRadarAI\web
+npm install
+npm run build
+cd ..
+.\scripts\run_web.ps1
+```
+
+Kubernetes:
+
+```powershell
+docker build -t ghcr.io/raphcvr/jobradarai-web:latest .
+docker push ghcr.io/raphcvr/jobradarai-web:latest
+.\scripts\deploy_web_k8s.ps1
+.\scripts\sync_web_data.ps1
+```
+
+Les donnees de runs, CV et secrets ne sont pas commites ni bakees dans l'image. Voir [docs/WEB_PLATFORM.md](docs/WEB_PLATFORM.md).
 
 ## Fichiers Importants
 

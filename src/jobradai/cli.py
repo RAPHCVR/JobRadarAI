@@ -14,6 +14,7 @@ from jobradai.link_check import verify_links
 from jobradai.llm_judge import LLMJudgeError, LLMSettings, judge_jobs
 from jobradai.pipeline import run_pipeline
 from jobradai.snapshot import write_snapshot
+from jobradai.webapp import run_web_app
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -72,6 +73,14 @@ def main(argv: list[str] | None = None) -> int:
     graduate.add_argument("--root", type=Path, default=PROJECT_ROOT)
     graduate.add_argument("--input", type=Path, default=None)
     graduate.add_argument("--output", type=Path, default=None)
+
+    web = sub.add_parser("web", help="Expose l'interface web locale ou Kubernetes.")
+    web.add_argument("--root", type=Path, default=PROJECT_ROOT)
+    web.add_argument("--output", type=Path, default=None)
+    web.add_argument("--state-path", type=Path, default=None)
+    web.add_argument("--static-dir", type=Path, default=None)
+    web.add_argument("--host", default="127.0.0.1")
+    web.add_argument("--port", type=int, default=8765)
 
     args = parser.parse_args(argv)
     if args.command == "sources":
@@ -212,6 +221,17 @@ def main(argv: list[str] | None = None) -> int:
                 ensure_ascii=False,
                 sort_keys=True,
             )
+        )
+        return 0
+    if args.command == "web":
+        config = load_config(args.root, load_env=False)
+        run_web_app(
+            root=args.root,
+            output_dir=(args.output or config.output_dir),
+            state_path=args.state_path,
+            static_dir=args.static_dir,
+            host=args.host,
+            port=args.port,
         )
         return 0
     return 2

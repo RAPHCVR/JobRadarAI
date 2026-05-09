@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: jobradarai-data
+  namespace: jobradarai
+  labels:
+    app.kubernetes.io/name: jobradarai-web
+    app.kubernetes.io/part-of: jobradarai
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: longhorn-custom
+  resources:
+    requests:
+      storage: 5Gi

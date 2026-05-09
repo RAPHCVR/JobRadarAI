@@ -111,6 +111,27 @@ $env:PYTHONPATH = "src"
 uv run --no-project --with-editable . -- python -m jobradai sources
 ```
 
+Interface web locale:
+
+```powershell
+cd C:\Users\Raphael\Documents\JobRadarAI\web
+npm install
+npm run build
+cd ..
+.\scripts\run_web.ps1
+```
+
+Plateforme web Kubernetes:
+
+```powershell
+docker build -t ghcr.io/raphcvr/jobradarai-web:latest .
+docker push ghcr.io/raphcvr/jobradarai-web:latest
+.\scripts\deploy_web_k8s.ps1
+.\scripts\sync_web_data.ps1
+```
+
+Details: `docs/WEB_PLATFORM.md`.
+
 Digest graduate/early-careers/doctorats seul:
 
 ```powershell

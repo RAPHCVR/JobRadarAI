@@ -11,6 +11,7 @@ Ce dossier separe les documents vivants des preuves historiques. La source de ve
 | [SOURCES.md](SOURCES.md) | Registre des sources actives, bloquees, hors scope et extensions candidates |
 | [MARKET_STRATEGY.md](MARKET_STRATEGY.md) | Priorites pays, titres, signaux forts/faibles et contraintes personnelles |
 | [BEST_PRACTICE_AUDIT.md](BEST_PRACTICE_AUDIT.md) | Audit systeme, garde-fous, architecture et reste a faire |
+| [WEB_PLATFORM.md](WEB_PLATFORM.md) | Interface web privee, Docker, Kubernetes, secrets et synchronisation des runs |
 
 ## Archives
 
