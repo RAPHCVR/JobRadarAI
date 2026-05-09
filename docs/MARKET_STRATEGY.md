@@ -51,13 +51,20 @@
 - Applied AI Engineer.
 - GenAI Engineer.
 - LLM Engineer.
+- LLM Application Engineer.
+- AI Research Engineer.
+- LLM Research Engineer.
 - LLMOps Engineer.
 - MLOps Engineer.
+- ML Engineer / AI/ML Engineer / ML Ops Engineer.
 - ML Platform Engineer.
 - AI Platform Engineer.
 - Research Engineer.
 - NLP Engineer.
 - Machine Learning Engineer.
+- Analytics Engineer, seulement si le contexte reste dbt/warehouse/data platform et pas BI reporting pur.
+- Applied Scientist, Interpretability Engineer, Explainability Engineer, AI Safety Engineer: veille niche high-signal, a filtrer strictement sur niveau/PhD/annees requises.
+- Knowledge Graph Engineer / Semantic Web Engineer: niche pertinente si RDF/SPARQL/OWL/LLM retrieval ou data platform.
 - Data Scientist oriente IA/ML production.
 - Intitules FR: `Ingénieur IA`, `Ingénieur Data`.
 
@@ -72,6 +79,7 @@
 - AWS Bedrock, Vertex AI, Azure AI.
 - Production, governance, distributed systems.
 - Mechanistic interpretability, explainability, AI safety.
+- Knowledge graphs, RDF, SPARQL, OWL, semantic web.
 
 ## Signaux A Degrader
 
@@ -108,6 +116,13 @@
 - Jooble et JobSpy Direct couvrent maintenant Austria, Sweden, Denmark, Norway, Finland, Spain, Portugal, Estonia, Poland et Czechia.
 - Le critere langue reste pragmatique: priorite aux roles anglophones/francophones ou aux offres dont le fit technique/salaire compense la langue locale a confirmer.
 - Le pipeline expose `deadline`, `language_check`, `remote_location_validity` et `salary_normalized_annual_eur` pour que le judge et la queue priorisent mieux sans devenir trop stricts.
+
+## Extension Titres Du 2026-05-09
+
+- P2 routine: `ML Engineer`, `AI/ML Engineer`, `ML Ops Engineer`, `AI Research Engineer`, `LLM Research Engineer`, `LLM Application Engineer`.
+- P2 bas: `Analytics Engineer`, garde seulement si les signaux dbt/warehouse/data platform compensent le bruit BI/analyst.
+- P3 veille niche: `Applied Scientist`, `Interpretability Engineer`, `Explainability Engineer`, `AI Safety Engineer`, `Knowledge Graph Engineer`, `Semantic Web Engineer`.
+- Les titres P3 sont disponibles dans la selection large et les filtres RSS/feed, mais ne remplacent pas les requetes coeur. Les garde-fous `required_years`/`experience_check` restent decisifs pour Applied Scientist et research roles souvent senior/PhD.
 
 ## Audit Dernier Run
 

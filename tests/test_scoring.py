@@ -349,6 +349,41 @@ class ScoringTests(unittest.TestCase):
         self.assertIn("github_actions", tokens)
         self.assertIn("azure_devops", tokens)
 
+    def test_niche_ai_data_titles_and_keywords_are_scored(self) -> None:
+        job = Job(
+            source="test",
+            source_type="ats",
+            title="Knowledge Graph Engineer",
+            company="Example",
+            url="https://example.com/kg",
+            location="Paris, France",
+            description="Python RDF OWL SPARQL semantic web analytics engineering and LLM retrieval platform.",
+        )
+        [scored] = score_jobs([job], self.config.profile, self.config.markets)
+        self.assertGreater(scored.score_parts["role"], 85)
+        self.assertGreater(scored.score_parts["technical"], 35)
+        tokens = _tokens(job.description)
+        self.assertIn("knowledge_graph", _tokens(job.title))
+        self.assertIn("semantic_web", tokens)
+        self.assertIn("analytics_engineering", tokens)
+
+    def test_applied_scientist_title_gets_research_signal_but_seniority_guard_still_applies(self) -> None:
+        job = Job(
+            source="test",
+            source_type="ats",
+            title="Applied Scientist",
+            company="Example",
+            url="https://example.com/applied-scientist",
+            location="London, United Kingdom",
+            description="Applied scientist role for LLM evaluation, Python and RAG. 5+ years of experience required.",
+        )
+        [scored] = score_jobs([job], self.config.profile, self.config.markets)
+        requirement = experience_requirement(job.title, job.description)
+        self.assertGreater(scored.score_parts["role"], 55)
+        self.assertLess(scored.score_parts["role"], 90)
+        self.assertEqual(requirement.check, "too_senior")
+        self.assertTrue(any("Experience exigee" in reason for reason in scored.reasons))
+
 
 if __name__ == "__main__":
     unittest.main()

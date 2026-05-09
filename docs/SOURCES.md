@@ -56,6 +56,7 @@ Les requetes globales incluent maintenant une couche dediee graduate/new-grad/ca
 - les programmes data/AI/software/research sont favorises legerement;
 - les CIFRE, industrial PhD et doctoral researcher data/AI/R&D sont detectes opportunistiquement;
 - Doctorat.gouv.fr et AcademicTransfer apportent maintenant une couche directe sur les sujets doctoraux publics pertinents, sans remplacer le coeur jobs data/AI;
+- Doctorat.gouv.fr et AcademicTransfer ont des requetes explicites interpretabilite/explicabilite/AI safety/knowledge graph/semantic web pour couvrir les niches recherche alignees avec le stage Aubay, avec filtres metier stricts;
 - les PhD purement academiques sans entreprise, statut/salaire ou sujet technique clair restent a verifier et ne doivent pas noyer la queue;
 - les programmes business/generalistes et stages/alternances restent penalises;
 - les sources avec limite de requetes gardent un quota minimal de requetes early-career sans remplacer les requetes coeur LLM/data engineering.
@@ -172,8 +173,8 @@ retries = 2
 Pour un SmartRecruiters bruite, ajouter des filtres de titres:
 
 ```toml
-queries = ["data engineer", "machine learning", "AI Engineer"]
-include_title_keywords = ["data engineer", "machine learning engineer", "ai engineer"]
+queries = ["data engineer", "machine learning", "AI Engineer", "AI Research Engineer"]
+include_title_keywords = ["data engineer", "machine learning engineer", "ml engineer", "ai engineer", "ai research engineer"]
 exclude_title_keywords = ["senior", "staff", "intern", "manager"]
 ```
 

@@ -73,7 +73,8 @@ Dernier full run complet valide documente: **2026-05-09 16:43 Europe/Paris**.
 - Correction de geographie pour eviter les faux positifs type `US-CA-Dublin`, `gent` dans `agentic` ou `uk` dans `Ukraine`.
 - Penalites titre pour roles non coeur: product/program manager, account, business development, customer success, marketing, recruiting, solution/support engineering.
 - Penalites de niveau pour profil junior/new-grad: senior, lead, principal, architect, VP, et exigences 3+/5+ ans.
-- Requetes sources FR/EN: `Ingénieur IA`, `Ingénieur Data`, `Machine Learning Engineer`, `Data Scientist`.
+- Requetes sources FR/EN: `Ingénieur IA`, `Ingénieur Data`, `Machine Learning Engineer`, `ML Engineer`, `AI Research Engineer`, `LLM Application Engineer`, `Data Scientist`.
+- Veille niche ajoutee sans durcir le tri: `Analytics Engineer`, `Applied Scientist`, `Interpretability Engineer`, `Explainability Engineer`, `AI Safety Engineer`, `Knowledge Graph Engineer`, `Semantic Web Engineer`; ces termes restent sous garde-fous niveau/experience/salaire/langue.
 - JobSpy Direct ne supprime plus les roles junior/graduate; seulement les stages/alternances non cibles.
 - Business France VIE scanne largement l'API officielle paginee; le tri metier se fait par score + LLM.
 - Forem et Actiris appliquent un filtre local minimal apres recherche source pour garder les signaux data/IA/LLM/research.
@@ -106,6 +107,7 @@ Dernier full run complet valide documente: **2026-05-09 16:43 Europe/Paris**.
 - `P1`: verifier manuellement salaire et remote quand l'offre ne publie pas l'information ou quand le LLM marque `unknown`/`weak`.
 - `P2`: confirmer avec RH les dates de demarrage `unknown`/`too_soon`; ne pas filtrer automatiquement sur ce signal.
 - `P2`: traiter `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux de tri et de verification; `too_senior` doit rester hors queue actionnable sauf override LLM junior/all-levels explicite.
+- `P2/P3`: surveiller au prochain run le bruit apporte par `Analytics Engineer` et `Applied Scientist`; garder seulement si les raisons de score restent data/AI/platform/research explicites.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
 - `P3`: demarrer `rainmanjam/jobspy-api` en Docker seulement si tu veux une API JobSpy permanente au lieu du mode uv direct; le mode direct est maintenant timeout-borne.
 - `P3`: DevITJobs-like/Wellfound/ABG/Campus France Doctorat/DAAD restent des tests ponctuels possibles, mais ne sont pas prioritaires apres l'ajout EURAXESS + Doctorat.gouv.fr + AcademicTransfer + RSS tech.

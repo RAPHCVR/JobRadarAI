@@ -188,6 +188,7 @@ Verdict: la couche marche et reste correctement secondaire. Elle capture les gra
 - Documentation vivante remise a jour sur le run `20260509-160240`.
 - Garde-fou ajoute: une offre avec `experience_check=too_senior` deterministe sort de la queue actionnable sauf override LLM `junior_ok`; les cas `stretch` 2-4 ans restent visibles.
 - Queue et audit regeneres apres ce garde-fou: **176** items, **0** `experience_check=too_senior` dans la queue.
+- Extension post-run des titres/requetes: `ML Engineer`, `AI/ML Engineer`, `ML Ops Engineer`, `AI Research Engineer`, `LLM Research Engineer`, `LLM Application Engineer`, `Analytics Engineer` et veille niche `Applied Scientist`/interpretability/explainability/AI safety/knowledge graph/semantic web. A mesurer au prochain run complet; tests unitaires et selection de requetes valides.
 - Workspace nettoye puis pousse sur GitHub.
 
 ## P0 A PN
@@ -198,6 +199,7 @@ Verdict: la couche marche et reste correctement secondaire. Elle capture les gra
 - `P1`: verifier salaire et remote quand l'offre ou le judge LLM marquent `unknown`/`weak`.
 - `P2`: utiliser `start_date_check` comme signal soft et confirmer avec RH les dates `unknown`/`too_soon`; ne pas auto-skipper.
 - `P2`: utiliser `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux soft. Les hard filters legitimes restent: remote explicitement incompatible, langue locale obligatoire non compensee par un fit tres fort, ou niveau/experience `too_senior` sans signal junior/all-levels explicite.
+- `P2/P3`: verifier le bruit des nouveaux titres au prochain run, surtout `Analytics Engineer` et `Applied Scientist`; conserver si le score et le judge remontent bien des roles data/AI/platform/research, pas BI reporting ou research senior hors cible.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
 - `P3`: JobSpy API Docker seulement si tu veux une API locale permanente; le mode uv direct suffit aujourd'hui et est timeout-borne.
 - `P3`: WTTJ, DevITJobs-like, Wellfound, ABG, Campus France Doctorat, DAAD/PhDGermany, ETH/EPFL restent des tests ponctuels possibles, pas des manques bloquants du systeme actuel.

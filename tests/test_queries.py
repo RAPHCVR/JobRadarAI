@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from jobradai.config import load_config
 from jobradai.queries import select_query_items, select_query_terms
 
 
@@ -44,6 +45,32 @@ class QuerySelectionTests(unittest.TestCase):
         self.assertIn("CIFRE IA", terms)
         doctoral = next(item for item in selected if item["term"] == "CIFRE IA")
         self.assertEqual(doctoral["category"], "research_doctoral")
+
+    def test_real_config_includes_p2_variants_in_routine_wide_selection(self) -> None:
+        config = load_config(load_env=False).sources
+        selected = select_query_terms(config, limit=24, early_career_min=5)
+        for term in [
+            "ML Engineer",
+            "AI Research Engineer",
+            "AI/ML Engineer",
+            "ML Ops Engineer",
+            "LLM Application Engineer",
+        ]:
+            self.assertIn(term, selected)
+
+    def test_real_config_keeps_low_volume_niche_watch_terms_available(self) -> None:
+        config = load_config(load_env=False).sources
+        selected = select_query_items(config)
+        by_term = {item["term"]: item for item in selected}
+        for term in [
+            "Applied Scientist",
+            "Interpretability Engineer",
+            "Explainability Engineer",
+            "AI Safety Engineer",
+            "Knowledge Graph Engineer",
+            "Semantic Web Engineer",
+        ]:
+            self.assertEqual(by_term[term]["category"], "niche_watch")
 
 
 if __name__ == "__main__":

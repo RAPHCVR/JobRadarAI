@@ -788,6 +788,8 @@ def _tokens(value: str) -> set[str]:
         tokens.add("rag")
     if "data engineer" in normalized or "data engineering" in normalized:
         tokens.add("data_engineering")
+    if "analytics engineer" in normalized or "analytics engineering" in normalized:
+        tokens.add("analytics_engineering")
     if (
         "graduate programme" in normalized
         or "graduate program" in normalized
@@ -841,7 +843,7 @@ def _tokens(value: str) -> set[str]:
         tokens.add("mlops")
     if "vector database" in normalized or "vector db" in normalized:
         tokens.add("vector_database")
-    if "applied research" in normalized:
+    if "applied research" in normalized or "applied scientist" in normalized:
         tokens.add("applied_research")
     if "mechanistic interpretability" in normalized or "interpretability" in normalized and "mechanistic" in normalized:
         tokens.add("mechanistic_interpretability")
@@ -861,6 +863,8 @@ def _tokens(value: str) -> set[str]:
         tokens.add("information_retrieval")
     if "knowledge graph" in normalized or "knowledge graphs" in normalized:
         tokens.add("knowledge_graph")
+    if "semantic web" in normalized:
+        tokens.add("semantic_web")
     if "time series" in normalized or "timeseries" in normalized or "séries temporelles" in normalized:
         tokens.add("time_series")
     if "anomaly detection" in normalized or "detection d anomal" in normalized or "détection d anomal" in normalized:

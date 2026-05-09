@@ -89,6 +89,7 @@ titles = [
   "Data Platform Engineer",
   "Research Engineer",
   "AI Research Engineer",
+  "LLM Research Engineer",
   "Doctorant CIFRE IA",
   "Doctorant CIFRE Data",
   "Industrial PhD AI",
@@ -98,9 +99,11 @@ titles = [
   "Explainability Engineer",
   "AI Safety Engineer",
   "Machine Learning Engineer",
+  "AI/ML Engineer",
   "Graduate Machine Learning Engineer",
   "Entry Level Machine Learning Engineer",
   "ML Engineer",
+  "ML Ops Engineer",
   "Junior Machine Learning Engineer",
   "New Grad Software Engineer",
   "New Grad AI Engineer",
@@ -112,8 +115,11 @@ titles = [
   "Backend AI Engineer",
   "LLM Application Engineer",
   "Forward Deployed AI Engineer",
+  "Applied Scientist",
   "Platform Engineer",
   "NLP Engineer",
+  "Knowledge Graph Engineer",
+  "Semantic Web Engineer",
   "Data Architect",
   "Analytics Engineer"
 ]
@@ -159,6 +165,7 @@ knowledge_graph = 7
 sparql = 7
 rdf = 6
 owl = 6
+semantic_web = 6
 time_series = 7
 anomaly_detection = 7
 root_cause_analysis = 7
@@ -176,6 +183,7 @@ nlp = 7
 information_retrieval = 7
 automation = 6
 data_quality = 6
+analytics_engineering = 5
 streaming = 7
 kafka = 7
 lakehouse = 6

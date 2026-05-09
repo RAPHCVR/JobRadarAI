@@ -35,6 +35,8 @@ Dernier full run valide documente: **2026-05-09 16:43 Europe/Paris**.
 
 Le full run inclut les extensions ajoutees pendant l'audit: Bundesagentur Jobsuche, SmartRecruiters durci, Delivery Hero filtre, correction du matching marche par alias bornes, JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS, Doctorat.gouv.fr, AcademicTransfer, WeWorkRemotely RSS, SwissDevJobs, GermanTechJobs, champs structures `deadline`/`language_check`/`remote_location_validity`/`required_years`/`experience_check`/salaire annualise EUR, extension graduate/early-career/doctorat industriel-CIFRE, et extension opportuniste Autriche/Nordics/Espagne/Portugal/Estonie/Pologne/Tchequie.
 
+Extension post-run validee par tests et smoke cible: les requetes couvrent aussi `ML Engineer`, `AI/ML Engineer`, `ML Ops Engineer`, `AI Research Engineer`, `LLM Research Engineer`, `LLM Application Engineer`, `Analytics Engineer`, et une veille niche `Applied Scientist`/interpretability/explainability/AI safety/knowledge graph/semantic web. L'impact volume/qualite est a mesurer au prochain full run.
+
 ## Lancer
 
 Depuis PowerShell:

@@ -56,12 +56,12 @@ page_size = 20
 max_pages = 2
 
 [france_travail]
-max_queries = 30
+max_queries = 42
 
 [bundesagentur]
 endpoint = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/jobs"
 api_key = "jobboerse-jobsuche"
-max_queries = 8
+max_queries = 11
 page_size = 20
 max_pages = 1
 countries = ["Deutschland", "Österreich"]
@@ -70,6 +70,9 @@ queries = [
   "AI Engineer",
   "LLM Engineer",
   "Machine Learning Engineer",
+  "ML Engineer",
+  "AI Research Engineer",
+  "Analytics Engineer",
   "MLOps Engineer",
   "Junior Data Engineer",
   "KI Data Engineer",
@@ -78,7 +81,7 @@ queries = [
 
 [jobtechdev_sweden]
 endpoint = "https://jobsearch.api.jobtechdev.se/search"
-max_queries = 8
+max_queries = 10
 page_size = 20
 max_pages = 1
 queries = [
@@ -86,6 +89,9 @@ queries = [
   "AI Engineer",
   "LLM Engineer",
   "Machine Learning Engineer",
+  "ML Engineer",
+  "AI Research Engineer",
+  "Analytics Engineer",
   "MLOps Engineer",
   "Junior Data Engineer",
   "Data Scientist"
@@ -93,7 +99,7 @@ queries = [
 
 [nav_norway]
 endpoint = "https://arbeidsplassen.nav.no/stillinger/api/search"
-max_queries = 8
+max_queries = 10
 page_size = 25
 max_pages = 1
 queries = [
@@ -101,6 +107,9 @@ queries = [
   "AI Engineer",
   "LLM Engineer",
   "Machine Learning Engineer",
+  "ML Engineer",
+  "AI Research Engineer",
+  "Analytics Engineer",
   "MLOps Engineer",
   "Junior Data Engineer",
   "Data Scientist"
@@ -113,7 +122,7 @@ max_results = 120
 
 [doctorat_gouv]
 endpoint = "https://app.doctorat.gouv.fr/api/propositions-these"
-max_queries = 8
+max_queries = 12
 page_size = 20
 max_pages = 2
 max_results = 160
@@ -125,6 +134,10 @@ queries = [
   "data science",
   "NLP",
   "intelligence artificielle",
+  "interprétabilité",
+  "explicabilité",
+  "graphe de connaissances",
+  "web sémantique",
   "jumeau numérique",
   "optimisation"
 ]
@@ -132,7 +145,7 @@ queries = [
 [academictransfer]
 token_page = "https://www.academictransfer.com/en/jobs/?q=phd"
 endpoint = "https://api.academictransfer.com/vacancies/"
-max_queries = 5
+max_queries = 8
 page_size = 10
 max_pages = 2
 max_results = 80
@@ -141,7 +154,10 @@ queries = [
   "phd data science",
   "phd artificial intelligence",
   "phd software",
-  "phd computer science"
+  "phd computer science",
+  "phd interpretability",
+  "phd knowledge graph",
+  "phd ai safety"
 ]
 
 [weworkremotely]
@@ -165,7 +181,7 @@ locations = ["Ireland", "Switzerland", "Belgium", "Singapore", "France", "Nether
 
 [adzuna]
 countries = ["fr", "gb", "de", "at", "pl", "nl", "be", "ch"]
-max_queries = 16
+max_queries = 20
 results_per_page = 30
 
 [optional_sources]
@@ -178,7 +194,7 @@ jobspy_direct = true
 vdab_generic = false
 
 [jobspy_direct]
-max_queries = 18
+max_queries = 20
 results_wanted = 12
 hours_old = 336
 timeout_seconds = 240
@@ -237,12 +253,24 @@ term = "Machine Learning Engineer"
 priority = 9
 
 [[queries]]
+term = "ML Engineer"
+priority = 9
+
+[[queries]]
+term = "AI/ML Engineer"
+priority = 8
+
+[[queries]]
 term = "Data Scientist"
 priority = 8
 
 [[queries]]
 term = "MLOps Engineer"
 priority = 9
+
+[[queries]]
+term = "ML Ops Engineer"
+priority = 8
 
 [[queries]]
 term = "LLMOps Engineer"
@@ -255,6 +283,52 @@ priority = 9
 [[queries]]
 term = "Research Engineer"
 priority = 8
+
+[[queries]]
+term = "AI Research Engineer"
+priority = 9
+
+[[queries]]
+term = "LLM Research Engineer"
+priority = 8
+
+[[queries]]
+term = "LLM Application Engineer"
+priority = 8
+
+[[queries]]
+term = "Analytics Engineer"
+priority = 7
+
+[[queries]]
+term = "Applied Scientist"
+priority = 7
+category = "niche_watch"
+
+[[queries]]
+term = "Interpretability Engineer"
+priority = 7
+category = "niche_watch"
+
+[[queries]]
+term = "Explainability Engineer"
+priority = 7
+category = "niche_watch"
+
+[[queries]]
+term = "AI Safety Engineer"
+priority = 7
+category = "niche_watch"
+
+[[queries]]
+term = "Knowledge Graph Engineer"
+priority = 7
+category = "niche_watch"
+
+[[queries]]
+term = "Semantic Web Engineer"
+priority = 7
+category = "niche_watch"
 
 [[queries]]
 term = "CIFRE IA"
