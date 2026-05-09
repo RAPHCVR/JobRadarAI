@@ -521,7 +521,7 @@ def _queue_markdown(result: dict[str, Any]) -> str:
             f"- `{status}` link `{link_status}` | {score:.1f} | fit `{item.get('early_career_fit')}` "
             f"`{structured}` | start `{item.get('last_start_date_check') or 'unknown'}` | "
             f"niveau `{item.get('last_level_fit') or 'unknown'}` | "
-            f"exp `{item.get('experience_check') or 'unknown'}`/{item.get('required_years') or 'n/a'}y | "
+            f"exp `{item.get('experience_check') or 'unknown'}`/{_required_years_label(item.get('required_years'))} | "
             f"deadline `{item.get('deadline') or 'n/a'}` | langue `{item.get('last_language_check') or 'unknown'}` | "
             f"{item.get('title')} - {item.get('company')} | {item.get('market')} | {item.get('url')}"
         )
@@ -547,7 +547,7 @@ def _queue_markdown(result: dict[str, Any]) -> str:
                 f"- `{status}` link `{link_status}` | {score:.1f} | "
                 f"start `{item.get('last_start_date_check') or 'unknown'}` | "
                 f"niveau `{item.get('last_level_fit') or 'unknown'}` | "
-                f"exp `{item.get('experience_check') or 'unknown'}`/{item.get('required_years') or 'n/a'}y | "
+                f"exp `{item.get('experience_check') or 'unknown'}`/{_required_years_label(item.get('required_years'))} | "
                 f"salaire `{item.get('last_salary_check') or 'unknown'}` | "
                 f"remote `{item.get('last_remote_check') or 'unknown'}` | "
                 f"langue `{item.get('last_language_check') or 'unknown'}` | "
@@ -802,7 +802,7 @@ def _application_messages_markdown(result: dict[str, Any]) -> str:
                 f"## {index}. {item.get('title')} - {item.get('company')}",
                 "",
                 f"- Bucket: `{item.get('queue_bucket')}` | Marche: `{item.get('market')}`",
-                f"- Checks: start `{item.get('start_date_check')}` | salaire `{item.get('salary_check')}` | remote `{item.get('remote_check')}` | langue `{item.get('language_check')}` | remote/localisation `{item.get('remote_location_validity')}` | experience `{item.get('experience_check')}`/{item.get('required_years') or 'n/a'}y | deadline `{item.get('deadline') or 'n/a'}`",
+                f"- Checks: start `{item.get('start_date_check')}` | salaire `{item.get('salary_check')}` | remote `{item.get('remote_check')}` | langue `{item.get('language_check')}` | remote/localisation `{item.get('remote_location_validity')}` | experience `{item.get('experience_check')}`/{_required_years_label(item.get('required_years'))} | deadline `{item.get('deadline') or 'n/a'}`",
                 f"- URL: {item.get('url')}",
                 "",
                 "```text",
@@ -885,6 +885,17 @@ def _payload_dict(value: Any) -> dict[str, Any]:
     except json.JSONDecodeError:
         return {}
     return parsed if isinstance(parsed, dict) else {}
+
+
+def _required_years_label(value: Any) -> str:
+    if value in (None, ""):
+        return "n/a"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    formatted = str(int(number)) if number.is_integer() else f"{number:g}"
+    return f"{formatted}y"
 
 
 def _float_or_none(value: Any) -> float | None:

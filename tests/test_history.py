@@ -154,6 +154,11 @@ class HistoryTests(unittest.TestCase):
             self.assertEqual(item["last_salary_check"], "meets_or_likely")
             self.assertEqual(item["last_remote_check"], "meets")
             self.assertIn("aout/septembre 2026", item["last_recruiter_message"])
+            queue_md = (output / "application_queue.md").read_text(encoding="utf-8")
+            messages_md = (output / "application_messages.md").read_text(encoding="utf-8")
+            self.assertNotIn("n/ay", queue_md)
+            self.assertNotIn("n/ay", messages_md)
+            self.assertIn("exp `unknown`/n/a |", queue_md)
 
     def test_sync_history_excludes_too_senior_items_from_queue(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
