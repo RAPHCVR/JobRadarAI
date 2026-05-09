@@ -2,7 +2,7 @@
 
 Derniere validation run: **2026-05-09 19:59 Europe/Paris**, full run large manuel `20260509-192018` apres audit, nettoyage, durcissement JobSpy Direct, extension sources/geographies, extension titres et garde-fous experience.
 
-Derniere validation plateforme web: **2026-05-09 23:40 Europe/Paris**, interface UI/UX amelioree, deployee sur Kubernetes sous `https://jobs.raphcvr.me`.
+Derniere validation plateforme web: **2026-05-09 23:44 Europe/Paris**, interface UI/UX amelioree, deployee sur Kubernetes sous `https://jobs.raphcvr.me`.
 
 Commande utilisee pour la base large:
 
@@ -34,7 +34,7 @@ Commande utilisee pour la base large:
 - Registre multi-run: `runs/history/job_history.sqlite`.
 - Logs: `runs/logs/`.
 - Tache Windows: `JobRadarAI-Daily` **desactivee**. Aucun run automatique ne doit partir tant que la tache reste `Disabled`.
-- Plateforme web: pod `jobradarai-web` **Running 1/1**, image `ghcr.io/raphcvr/jobradarai-web:sha-e7ad16a`, ingress `jobs.raphcvr.me`, PVC Longhorn `jobradarai-data` 5Gi, auth active.
+- Plateforme web: pod `jobradarai-web` **Running 1/1**, image GHCR deployee via tag SHA explicite, ingress `jobs.raphcvr.me`, PVC Longhorn `jobradarai-data` 5Gi, auth active.
 - Smoke web HTTPS: `/api/health` OK, login OK, `run_name=20260509-192018`, `queue_count=181`, CV PDF disponible, rendu desktop/mobile OK sans overflow horizontal.
 
 Exports principaux:
