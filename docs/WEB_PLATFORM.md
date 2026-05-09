@@ -9,11 +9,11 @@ Host cible Kubernetes: `https://jobs.raphcvr.me`.
 L'interface expose:
 
 - dashboard pipeline par statut candidature;
-- queue filtrable par bucket, marche, statut lien, statut utilisateur et recherche texte;
+- queue filtrable par bucket, marche, statut lien, statut utilisateur et recherche texte, avec tri radar/score/dernieres notes;
 - detail offre avec signaux `start_date_check`, `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check`, salaire normalise quand disponible;
-- edition de `application_status`, `fit_status`, priorite, notes, prochaine action, contact;
+- edition de `application_status`, `fit_status`, priorite, notes, prochaine action, contact, URL de candidature, URL contact/profil RH, dernier contact et variante CV;
 - timeline manuelle par offre;
-- bouton d'ouverture du lien de candidature et copie du message RH;
+- bouton d'ouverture du lien de candidature, ouverture contact et copie du message RH avec feedback visuel;
 - visualisation du CV PDF si `runs/cv/main.pdf` est monte, sinon source TeX.
 
 ## Securite

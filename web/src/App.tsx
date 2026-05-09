@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   BriefcaseBusiness,
   CalendarClock,
   CheckCircle2,
@@ -10,6 +11,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  SlidersHorizontal,
 } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Badge } from "./components/ui/badge";
@@ -43,9 +45,9 @@ const fitOptions: Array<{ value: FitStatus; label: string }> = [
 
 const priorityOptions: Array<{ value: UserPriority; label: string }> = [
   { value: "normal", label: "Normal" },
-  { value: "high", label: "High" },
+  { value: "high", label: "Haute" },
   { value: "urgent", label: "Urgent" },
-  { value: "low", label: "Low" },
+  { value: "low", label: "Basse" },
 ];
 
 type Filters = {
@@ -55,6 +57,7 @@ type Filters = {
   market: string;
   link_status: string;
   active: string;
+  sort: string;
 };
 
 const emptyFilters: Filters = {
@@ -64,7 +67,10 @@ const emptyFilters: Filters = {
   market: "",
   link_status: "",
   active: "1",
+  sort: "priority",
 };
+
+type Notice = { type: "success" | "error"; message: string };
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
@@ -76,6 +82,7 @@ export default function App() {
   const [view, setView] = useState<"pipeline" | "queue" | "cv">("pipeline");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState<Notice | null>(null);
 
   const selectedJob = useMemo(
     () => jobs.find((job) => job.stable_id === selectedId) ?? jobs[0],
@@ -91,6 +98,12 @@ export default function App() {
       void reload();
     }
   }, [authenticated, filters]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timeout = window.setTimeout(() => setNotice(null), 2800);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
 
   async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     const headers = new Headers(init.headers);
@@ -167,22 +180,45 @@ export default function App() {
   }
 
   async function patchJob(job: JobItem, patch: Partial<JobItem>) {
-    const payload = await api<{ job: JobItem }>(`/api/jobs/${job.stable_id}/state`, {
-      method: "PATCH",
-      body: JSON.stringify(patch),
-    });
-    setJobs((current) => current.map((item) => (item.stable_id === job.stable_id ? payload.job : item)));
-    setSelectedId(job.stable_id);
+    try {
+      const payload = await api<{ job: JobItem }>(`/api/jobs/${job.stable_id}/state`, {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      });
+      setJobs((current) => current.map((item) => (item.stable_id === job.stable_id ? payload.job : item)));
+      setSelectedId(job.stable_id);
+      setNotice({ type: "success", message: "Modification sauvegardee." });
+    } catch (err) {
+      setNotice({ type: "error", message: err instanceof Error ? err.message : "Sauvegarde impossible." });
+    }
   }
 
   async function addEvent(job: JobItem, note: string) {
     if (!note.trim()) return;
-    const payload = await api<{ job: JobItem }>(`/api/jobs/${job.stable_id}/events`, {
-      method: "POST",
-      body: JSON.stringify({ type: "note", note }),
-    });
-    setJobs((current) => current.map((item) => (item.stable_id === job.stable_id ? payload.job : item)));
-    setSelectedId(job.stable_id);
+    try {
+      const payload = await api<{ job: JobItem }>(`/api/jobs/${job.stable_id}/events`, {
+        method: "POST",
+        body: JSON.stringify({ type: "note", note }),
+      });
+      setJobs((current) => current.map((item) => (item.stable_id === job.stable_id ? payload.job : item)));
+      setSelectedId(job.stable_id);
+      setNotice({ type: "success", message: "Note ajoutee a la timeline." });
+    } catch (err) {
+      setNotice({ type: "error", message: err instanceof Error ? err.message : "Ajout de note impossible." });
+    }
+  }
+
+  async function copyToClipboard(text: string, label = "Texte") {
+    if (!text.trim()) {
+      setNotice({ type: "error", message: "Aucun contenu a copier." });
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setNotice({ type: "success", message: `${label} copie.` });
+    } catch {
+      setNotice({ type: "error", message: "Copie impossible depuis ce navigateur." });
+    }
   }
 
   if (authenticated === null) {
@@ -213,7 +249,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => void reload()} disabled={busy}>
               <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} />
-              Refresh
+              Actualiser
             </Button>
             <Button variant="ghost" size="icon" aria-label="Deconnexion" onClick={() => void logout()}>
               <LogOut className="h-4 w-4" />
@@ -222,7 +258,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-[1680px] gap-4 px-4 py-4 lg:grid-cols-[300px_minmax(0,1fr)_430px]">
+      <main className="mx-auto grid max-w-[1680px] gap-4 px-4 py-4 lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)_430px]">
         <aside className="space-y-4 lg:sticky lg:top-[78px] lg:self-start">
           <SummaryCards summary={summary} />
           <Card>
@@ -237,11 +273,12 @@ export default function App() {
             </CardHeader>
             <CardContent className="space-y-3">
               <Input
+                aria-label="Recherche dans les offres"
                 placeholder="Titre, entreprise, signal..."
                 value={filters.q}
                 onChange={(event) => setFilters({ ...filters, q: event.target.value })}
               />
-              <Select value={filters.bucket} onChange={(event) => setFilters({ ...filters, bucket: event.target.value })}>
+              <Select aria-label="Filtrer par bucket" value={filters.bucket} onChange={(event) => setFilters({ ...filters, bucket: event.target.value })}>
                 <option value="">Tous buckets</option>
                 <option value="apply_now">Apply now</option>
                 <option value="shortlist">Shortlist</option>
@@ -249,6 +286,7 @@ export default function App() {
                 <option value="maybe">Maybe</option>
               </Select>
               <Select
+                aria-label="Filtrer par statut de candidature"
                 value={filters.application_status}
                 onChange={(event) => setFilters({ ...filters, application_status: event.target.value })}
               >
@@ -259,7 +297,7 @@ export default function App() {
                   </option>
                 ))}
               </Select>
-              <Select value={filters.market} onChange={(event) => setFilters({ ...filters, market: event.target.value })}>
+              <Select aria-label="Filtrer par pays" value={filters.market} onChange={(event) => setFilters({ ...filters, market: event.target.value })}>
                 <option value="">Tous pays</option>
                 {markets.map((market) => (
                   <option key={market} value={market}>
@@ -268,6 +306,7 @@ export default function App() {
                 ))}
               </Select>
               <Select
+                aria-label="Filtrer par statut du lien"
                 value={filters.link_status}
                 onChange={(event) => setFilters({ ...filters, link_status: event.target.value })}
               >
@@ -278,9 +317,14 @@ export default function App() {
                   </option>
                 ))}
               </Select>
-              <Select value={filters.active} onChange={(event) => setFilters({ ...filters, active: event.target.value })}>
+              <Select aria-label="Filtrer les offres actives" value={filters.active} onChange={(event) => setFilters({ ...filters, active: event.target.value })}>
                 <option value="1">Actives uniquement</option>
                 <option value="">Actives + stale</option>
+              </Select>
+              <Select aria-label="Trier les offres" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value })}>
+                <option value="priority">Tri radar</option>
+                <option value="score">Score decroissant</option>
+                <option value="updated">Dernieres notes</option>
               </Select>
               {error ? <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">{error}</p> : null}
             </CardContent>
@@ -288,19 +332,25 @@ export default function App() {
         </aside>
 
         <section className="min-w-0 space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant={view === "pipeline" ? "default" : "outline"} size="sm" onClick={() => setView("pipeline")}>
-              <BriefcaseBusiness className="h-4 w-4" />
-              Pipeline
-            </Button>
-            <Button variant={view === "queue" ? "default" : "outline"} size="sm" onClick={() => setView("queue")}>
-              <MessageSquareText className="h-4 w-4" />
-              Queue
-            </Button>
-            <Button variant={view === "cv" ? "default" : "outline"} size="sm" onClick={() => setView("cv")}>
-              <FileText className="h-4 w-4" />
-              CV
-            </Button>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant={view === "pipeline" ? "default" : "outline"} size="sm" onClick={() => setView("pipeline")}>
+                <BriefcaseBusiness className="h-4 w-4" />
+                Pipeline
+              </Button>
+              <Button variant={view === "queue" ? "default" : "outline"} size="sm" onClick={() => setView("queue")}>
+                <MessageSquareText className="h-4 w-4" />
+                Queue
+              </Button>
+              <Button variant={view === "cv" ? "default" : "outline"} size="sm" onClick={() => setView("cv")}>
+                <FileText className="h-4 w-4" />
+                CV
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <SlidersHorizontal className="h-4 w-4" />
+              {jobs.length} offres affichees
+            </div>
           </div>
 
           {view === "pipeline" ? (
@@ -310,8 +360,9 @@ export default function App() {
           {view === "cv" ? <CvPanel summary={summary} /> : null}
         </section>
 
-        <DetailPanel job={selectedJob} onPatch={patchJob} onAddEvent={addEvent} />
+        <DetailPanel job={selectedJob} onPatch={patchJob} onAddEvent={addEvent} onCopyText={copyToClipboard} />
       </main>
+      <NoticeToast notice={notice} />
     </div>
   );
 }
@@ -404,27 +455,35 @@ function Pipeline({
   onPatch: (job: JobItem, patch: Partial<JobItem>) => Promise<void>;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
       {statusOptions.map((status) => {
-        const columnJobs = jobs.filter((job) => job.application_status === status.value).slice(0, 28);
+        const allColumnJobs = jobs.filter((job) => job.application_status === status.value);
+        const columnJobs = allColumnJobs.slice(0, 28);
         return (
           <Card key={status.value} className="min-w-0">
             <CardHeader className="p-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold">{status.label}</p>
-                <p className="text-xs text-muted-foreground">{columnJobs.length} visibles</p>
+                <p className="text-xs text-muted-foreground">
+                  {columnJobs.length}
+                  {allColumnJobs.length > columnJobs.length ? ` / ${allColumnJobs.length}` : ""} visibles
+                </p>
               </div>
             </CardHeader>
             <CardContent className="max-h-[760px] space-y-2 overflow-auto p-3 scrollbar-thin">
-              {columnJobs.map((job) => (
-                <JobCard
-                  key={job.stable_id}
-                  job={job}
-                  selected={job.stable_id === selectedId}
-                  onSelect={onSelect}
-                  onPatch={onPatch}
-                />
-              ))}
+              {columnJobs.length ? (
+                columnJobs.map((job) => (
+                  <JobCard
+                    key={job.stable_id}
+                    job={job}
+                    selected={job.stable_id === selectedId}
+                    onSelect={onSelect}
+                    onPatch={onPatch}
+                  />
+                ))
+              ) : (
+                <EmptyState label="Aucune offre dans ce statut." />
+              )}
             </CardContent>
           </Card>
         );
@@ -445,29 +504,34 @@ function JobCard({
   onPatch: (job: JobItem, patch: Partial<JobItem>) => Promise<void>;
 }) {
   return (
-    <button
+    <article
       className={cn(
-        "w-full rounded-md border bg-background p-3 text-left transition hover:border-primary",
+        "rounded-md border bg-background p-3 transition hover:border-primary",
         selected && "border-primary ring-1 ring-primary"
       )}
-      onClick={() => onSelect(job.stable_id)}
     >
-      <div className="flex min-w-0 items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="line-clamp-2 text-sm font-semibold">{job.title || "Sans titre"}</p>
-          <p className="truncate text-xs text-muted-foreground">{job.company || "Entreprise inconnue"}</p>
+      <button className="block w-full text-left" onClick={() => onSelect(job.stable_id)}>
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="line-clamp-2 text-sm font-semibold">{job.title || "Sans titre"}</p>
+            <p className="truncate text-xs text-muted-foreground">{job.company || "Entreprise inconnue"}</p>
+          </div>
+          <Badge className="shrink-0" variant={bucketVariant(job.queue_bucket)}>
+            {bucketLabel(job.queue_bucket)}
+          </Badge>
         </div>
-        <Badge variant={bucketVariant(job.queue_bucket)}>{job.queue_bucket || "queue"}</Badge>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-1">
-        <Badge variant="outline">{scoreLabel(job)}</Badge>
-        <Badge variant={checkVariant(job.experience_check)}>{job.experience_check || "xp ?"}</Badge>
-        <Badge variant={checkVariant(job.remote_location_validity)}>{job.remote_location_validity || "remote ?"}</Badge>
-      </div>
+        <div className="mt-3 flex flex-wrap gap-1">
+          <Badge variant="outline">{scoreLabel(job)}</Badge>
+          <Badge variant={checkVariant(job.experience_check)}>{job.experience_check || "xp ?"}</Badge>
+          <Badge variant={checkVariant(job.remote_location_validity || job.remote_check)}>
+            {job.remote_location_validity || job.remote_check || "remote ?"}
+          </Badge>
+        </div>
+      </button>
       <Select
+        aria-label={`Changer le statut de ${job.title || "cette offre"}`}
         className="mt-3 h-8"
         value={job.application_status}
-        onClick={(event) => event.stopPropagation()}
         onChange={(event) => void onPatch(job, { application_status: event.target.value as ApplicationStatus })}
       >
         {statusOptions.map((status) => (
@@ -476,7 +540,7 @@ function JobCard({
           </option>
         ))}
       </Select>
-    </button>
+    </article>
   );
 }
 
@@ -490,28 +554,36 @@ function Queue({ jobs, selectedId, onSelect }: { jobs: JobItem[]; selectedId?: s
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="divide-y">
-          {jobs.map((job) => (
-            <button
-              key={job.stable_id}
-              className={cn(
-                "grid w-full gap-2 px-4 py-3 text-left hover:bg-muted/70 md:grid-cols-[minmax(0,1fr)_120px_130px_120px]",
-                selectedId === job.stable_id && "bg-secondary/60"
-              )}
-              onClick={() => onSelect(job.stable_id)}
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{job.title}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {job.company} · {job.market} · {job.source}
-                </p>
-              </div>
-              <Badge variant={bucketVariant(job.queue_bucket)}>{job.queue_bucket || "queue"}</Badge>
-              <Badge variant={checkVariant(job.experience_check)}>{job.experience_check || "experience ?"}</Badge>
-              <p className="text-sm font-medium">{scoreLabel(job)}</p>
-            </button>
-          ))}
-        </div>
+        {jobs.length ? (
+          <div className="divide-y">
+            {jobs.map((job) => (
+              <button
+                key={job.stable_id}
+                className={cn(
+                  "grid w-full gap-2 px-4 py-3 text-left hover:bg-muted/70 md:grid-cols-[minmax(0,1fr)_120px_130px_120px]",
+                  selectedId === job.stable_id && "bg-secondary/60"
+                )}
+                onClick={() => onSelect(job.stable_id)}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">{job.title}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {job.company} · {job.market} · {job.source}
+                  </p>
+                </div>
+                <Badge className="shrink-0" variant={bucketVariant(job.queue_bucket)}>
+                  {bucketLabel(job.queue_bucket)}
+                </Badge>
+                <Badge variant={checkVariant(job.experience_check)}>{job.experience_check || "experience ?"}</Badge>
+                <p className="text-sm font-medium">{scoreLabel(job)}</p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="p-4">
+            <EmptyState label="Aucune offre ne correspond aux filtres." />
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -521,22 +593,30 @@ function DetailPanel({
   job,
   onPatch,
   onAddEvent,
+  onCopyText,
 }: {
   job?: JobItem;
   onPatch: (job: JobItem, patch: Partial<JobItem>) => Promise<void>;
   onAddEvent: (job: JobItem, note: string) => Promise<void>;
+  onCopyText: (text: string, label?: string) => Promise<void>;
 }) {
   const [notes, setNotes] = useState("");
   const [eventNote, setEventNote] = useState("");
+  const [applicationUrl, setApplicationUrl] = useState("");
+  const [contactUrl, setContactUrl] = useState("");
+  const [customCv, setCustomCv] = useState("");
 
   useEffect(() => {
     setNotes(job?.notes || "");
     setEventNote("");
-  }, [job?.stable_id, job?.notes]);
+    setApplicationUrl(job?.application_url || "");
+    setContactUrl(job?.contact_url || "");
+    setCustomCv(job?.custom_cv || "");
+  }, [job?.stable_id, job?.notes, job?.application_url, job?.contact_url, job?.custom_cv]);
 
   if (!job) {
     return (
-      <aside className="lg:sticky lg:top-[78px] lg:self-start">
+      <aside className="xl:sticky xl:top-[78px] xl:self-start">
         <Card>
           <CardContent className="text-sm text-muted-foreground">Aucune offre dans les filtres actuels.</CardContent>
         </Card>
@@ -546,7 +626,7 @@ function DetailPanel({
 
   const angle = job.application_angle || job.last_application_angle || "";
   return (
-    <aside className="space-y-4 lg:sticky lg:top-[78px] lg:max-h-[calc(100vh-96px)] lg:overflow-auto lg:self-start lg:pr-1 scrollbar-thin">
+    <aside className="space-y-4 lg:col-span-2 xl:col-span-1 xl:sticky xl:top-[78px] xl:max-h-[calc(100vh-96px)] xl:overflow-auto xl:self-start xl:pr-1 scrollbar-thin">
       <Card>
         <CardHeader>
           <div className="min-w-0">
@@ -555,7 +635,9 @@ function DetailPanel({
               {job.company} · {job.market} · {job.location || job.source}
             </p>
           </div>
-          <Badge variant={bucketVariant(job.queue_bucket)}>{job.queue_bucket || "queue"}</Badge>
+          <Badge className="shrink-0" variant={bucketVariant(job.queue_bucket)}>
+            {bucketLabel(job.queue_bucket)}
+          </Badge>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-2 text-sm">
@@ -573,6 +655,7 @@ function DetailPanel({
 
           <div className="grid gap-2 sm:grid-cols-3">
             <Select
+              aria-label="Statut de candidature"
               value={job.application_status}
               onChange={(event) => void onPatch(job, { application_status: event.target.value as ApplicationStatus })}
             >
@@ -582,7 +665,7 @@ function DetailPanel({
                 </option>
               ))}
             </Select>
-            <Select value={job.fit_status} onChange={(event) => void onPatch(job, { fit_status: event.target.value as FitStatus })}>
+            <Select aria-label="Fit utilisateur" value={job.fit_status} onChange={(event) => void onPatch(job, { fit_status: event.target.value as FitStatus })}>
               {fitOptions.map((status) => (
                 <option key={status.value} value={status.value}>
                   {status.label}
@@ -590,6 +673,7 @@ function DetailPanel({
               ))}
             </Select>
             <Select
+              aria-label="Priorite utilisateur"
               value={job.user_priority}
               onChange={(event) => void onPatch(job, { user_priority: event.target.value as UserPriority })}
             >
@@ -603,23 +687,59 @@ function DetailPanel({
 
           <div className="grid gap-2 sm:grid-cols-2">
             <Input
+              aria-label="Date de prochaine action"
               type="date"
               value={job.next_action_at}
               onChange={(event) => void onPatch(job, { next_action_at: event.target.value })}
             />
             <Input
+              aria-label="Nom du contact"
               placeholder="Contact"
               value={job.contact_name}
               onChange={(event) => void onPatch(job, { contact_name: event.target.value })}
             />
           </div>
 
+          <div className="space-y-2">
+            <Input
+              aria-label="URL de candidature"
+              placeholder="URL de candidature"
+              value={applicationUrl}
+              onChange={(event) => setApplicationUrl(event.target.value)}
+              onBlur={() => void onPatch(job, { application_url: applicationUrl })}
+            />
+            <Input
+              aria-label="URL du contact ou profil RH"
+              placeholder="URL contact / profil RH"
+              value={contactUrl}
+              onChange={(event) => setContactUrl(event.target.value)}
+              onBlur={() => void onPatch(job, { contact_url: contactUrl })}
+            />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Input
+                aria-label="Dernier contact"
+                type="date"
+                value={job.last_contacted_at}
+                onChange={(event) => void onPatch(job, { last_contacted_at: event.target.value })}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!job.contact_url}
+                onClick={() => openLink(job.contact_url)}
+              >
+                <ExternalLink className="h-4 w-4" />
+                Contact
+              </Button>
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-2">
-            <Button variant="default" size="sm" onClick={() => openLink(job.application_url || job.url)}>
+            <Button variant="default" size="sm" disabled={!(job.application_url || job.url)} onClick={() => openLink(job.application_url || job.url)}>
               <ExternalLink className="h-4 w-4" />
               Candidater
             </Button>
-            <Button variant="outline" size="sm" onClick={() => void copyText(job.recruiter_message || angle)}>
+            <Button variant="outline" size="sm" disabled={!(job.recruiter_message || angle)} onClick={() => void onCopyText(job.recruiter_message || angle, "Message RH")}>
               <Copy className="h-4 w-4" />
               Copier message
             </Button>
@@ -640,6 +760,16 @@ function DetailPanel({
           <div>
             <p className="mb-1 text-xs font-medium text-muted-foreground">Message RH</p>
             <Textarea readOnly value={job.recruiter_message || ""} className="min-h-40" />
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground">CV / variante a utiliser</p>
+              <Button size="sm" variant="outline" onClick={() => void onPatch(job, { custom_cv: customCv })}>
+                Sauver
+              </Button>
+            </div>
+            <Textarea value={customCv} onChange={(event) => setCustomCv(event.target.value)} placeholder="Ex: CV data/AI, CV research, ajustements a faire avant candidature..." />
           </div>
 
           {job.experience_evidence ? (
@@ -705,6 +835,31 @@ function Signal({ label, value }: { label: string; value: string }) {
   );
 }
 
+function EmptyState({ label }: { label: string }) {
+  return (
+    <div className="rounded-md border border-dashed bg-muted/30 p-4 text-sm text-muted-foreground">
+      {label}
+    </div>
+  );
+}
+
+function NoticeToast({ notice }: { notice: Notice | null }) {
+  if (!notice) return null;
+  const Icon = notice.type === "success" ? CheckCircle2 : AlertTriangle;
+  return (
+    <div
+      role="status"
+      className={cn(
+        "fixed bottom-4 right-4 z-50 flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm shadow-lg",
+        notice.type === "success" ? "border-emerald-200 text-emerald-800" : "border-destructive/30 text-destructive"
+      )}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="truncate">{notice.message}</span>
+    </div>
+  );
+}
+
 function CvPanel({ summary }: { summary: Summary | null }) {
   const cv = summary?.cv;
   return (
@@ -751,6 +906,14 @@ function bucketVariant(bucket?: string) {
   return "muted";
 }
 
+function bucketLabel(bucket?: string) {
+  if (bucket === "apply_now") return "Apply now";
+  if (bucket === "shortlist") return "Shortlist";
+  if (bucket === "high_score") return "High score";
+  if (bucket === "maybe") return "Maybe";
+  return "Queue";
+}
+
 function checkVariant(value?: string) {
   if (!value) return "muted";
   if (["meets", "compatible", "english_ok", "junior_ok", "ok"].includes(value)) return "success";
@@ -761,11 +924,6 @@ function checkVariant(value?: string) {
 function openLink(url?: string) {
   if (!url) return;
   window.open(url, "_blank", "noopener,noreferrer");
-}
-
-async function copyText(text: string) {
-  if (!text) return;
-  await navigator.clipboard.writeText(text);
 }
 
 function formatDate(value: string) {
