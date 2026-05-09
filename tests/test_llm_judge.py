@@ -4,6 +4,7 @@ import unittest
 
 from jobradai.llm_judge import (
     _chunks,
+    _compact_job,
     _ensure_complete_judgements,
     _merge_judgements,
     _normalise_judgements,
@@ -52,6 +53,13 @@ class LLMJudgeTests(unittest.TestCase):
         self.assertEqual(result["a"]["salary_check"], "unknown")
         self.assertEqual(result["a"]["start_date_check"], "unknown")
 
+    def test_normalise_judgements_downgrades_too_senior_actionable_priority(self) -> None:
+        jobs = [{"stable_id": "senior"}]
+        raw = {"items": [{"stable_id": "senior", "fit_score": 85, "priority": "shortlist", "level_fit": "too_senior"}]}
+        result = _normalise_judgements(raw, jobs)
+        self.assertEqual(result["senior"]["priority"], "skip")
+        self.assertEqual(result["senior"]["level_fit"], "too_senior")
+
     def test_complete_judgements_rejects_missing_batch_items(self) -> None:
         jobs = [{"stable_id": "a"}, {"stable_id": "b"}]
         with self.assertRaises(LLMJudgeError):
@@ -86,6 +94,22 @@ class LLMJudgeTests(unittest.TestCase):
         self.assertEqual(merged["llm_fit_score"], 90)
         self.assertEqual(merged["priority"], "apply_now")
         self.assertEqual(merged["start_date_check"], "compatible")
+
+    def test_compact_job_exposes_experience_signals_to_llm(self) -> None:
+        compact = _compact_job(
+            {
+                "stable_id": "senior",
+                "title": "Senior AI Engineer",
+                "company": "Acme",
+                "url": "https://example.com",
+                "required_years": 5,
+                "experience_check": "too_senior",
+                "experience_evidence": "at least 5 years of professional experience",
+            }
+        )
+        self.assertEqual(compact["required_years"], 5)
+        self.assertEqual(compact["experience_check"], "too_senior")
+        self.assertIn("5 years", compact["experience_evidence"])
 
     def test_chunks_and_usage_sum_for_batched_judge(self) -> None:
         self.assertEqual(_chunks([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]])

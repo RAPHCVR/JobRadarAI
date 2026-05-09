@@ -1,6 +1,6 @@
 # Audit Best Practice
 
-Derniere mise a jour: **2026-05-08**.
+Derniere mise a jour: **2026-05-09**.
 
 ## Verdict
 
@@ -15,27 +15,30 @@ Le projet suit ce modele. Il est utilisable en routine manuelle ou quotidienne d
 
 ## Etat Runtime Valide
 
-Dernier run complet valide: **2026-05-08 18:49 Europe/Paris**.
+Dernier full run complet valide documente: **2026-05-08 21:34 Europe/Paris**.
 
-- 2788 offres retenues.
+Note post-audit du **2026-05-08/09**: Bundesagentur Jobsuche, Delivery Hero SmartRecruiters filtre, correction du matching pays, JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS, Doctorat.gouv.fr, AcademicTransfer, WeWorkRemotely RSS, SwissDevJobs, GermanTechJobs, champs structures P2 dont `required_years`/`experience_check`, et extension Autriche/Nordics/Espagne/Portugal/Estonie/Pologne/Tchequie ont ete ajoutes et valides par tests/smoke cibles apres ce full run. Les compteurs ci-dessous restent ceux du run complet indique.
+
+- 2895 offres retenues.
 - 43 sources OK.
 - 2 skips attendus: Adzuna sans credentials, JobSpy API local injoignable.
 - 0 erreur source.
 - 364 VIE retenus.
 - 200 offres jugees par le LLM en `balanced`.
-- 278 liens verifies.
-- Snapshot: `runs/history/final-20260508-p2p3-complete`.
+- 166 liens verifies en mode priority-aware.
+- Snapshot: `runs/history/final-20260508-expanded-github-ready-v3`.
 - Registre multi-run: `runs/history/job_history.sqlite`.
-- Queue dedupee: `runs/latest/application_queue.md`, 127 items sur le dernier run.
-- Historique: 183 nouvelles offres, 163 disparues marquees `stale`, 0 `expired`.
+- Queue dedupee: `runs/latest/application_queue.md`, 108 items sur le dernier run apres durcissement `too_senior`/signaux structures.
+- Historique: 302 nouvelles offres, 358 disparues marquees `stale`, 0 `expired`.
 - P0: aucun blocage runtime detecte.
 
 ## Repos Et Systemes Audites
 
-- `speedyapply/JobSpy`: meilleure brique open-source pratique pour Indeed/Glassdoor/LinkedIn/Google/ZipRecruiter; utilisee en mode direct via `uv`, sans `.venv` projet. LinkedIn reste desactive par defaut.
+- `speedyapply/JobSpy`: meilleure brique open-source pratique pour Indeed et quelques boards generalistes; utilisee en mode direct via `uv`, sans `.venv` projet. Glassdoor a ete teste puis mis hors scope, LinkedIn reste desactive par defaut.
 - `rainmanjam/jobspy-api`: option Docker/FastAPI si on veut un service local permanent avec API key, cache, rate limiting et proxy. Pas necessaire ici tant que le mode direct uv suffit.
 - `stickerdaniel/linkedin-mcp-server`: MCP LinkedIn mature pour profils, jobs et messages, mais avec risque ToS et absence de rate limit fort. Non integre volontairement.
 - `ChanMeng666/server-google-jobs`: MCP Google Jobs via SerpAPI. Mis de cote ici car le quota SerpAPI est trop faible pour la routine.
+- `A-tavv/phd_position_tracker` et `Yukiinoa/foryourseek_v1.0`: utiles pour confirmer le pattern AcademicTransfer public `__NUXT_DATA__` + `api.academictransfer.com/vacancies/`. Integre localement sous forme minimale, sans reprendre leur crawler complet.
 - Petits scrapers ATS publics Greenhouse/Lever/Ashby: aucun projet public trouve ne justifie de remplacer le code local. La bonne approche reste de garder des parsers simples et d'ajouter des boards verifies.
 
 ## Sources Officielles Et ATS
@@ -44,23 +47,32 @@ Dernier run complet valide: **2026-05-08 18:49 Europe/Paris**.
 - Business France VIE: actif sans cle via l'API officielle Mon Volontariat International.
 - Le Forem Open Data: actif sans cle via ODWB/Opendatasoft; apporte Wallonie-Bruxelles et une couverture partielle VDAB traduite.
 - Actiris: actif sans cle via endpoint JSON du site officiel.
+- Bundesagentur Jobsuche: actif sans cle, source officielle Allemagne + Autriche, filtree par pays pour eviter de melanger `Deutschland` et `Österreich`.
+- JobTechDev Sweden: actif sans cle, source officielle Suede.
+- NAV Arbeidsplassen Norway: actif sans cle via endpoint public de recherche; le feed NAV tokenise n'est pas necessaire pour la decouverte.
+- EURAXESS: actif sans cle comme source verticale research/AI institutions, avec filtre strict sur AI/data/ML.
+- Doctorat.gouv.fr: actif sans cle via API officielle publique des propositions de theses; les sujets deja attribues sont ignores par defaut et les CIFRE/doctorats AI/data/software sont traites comme opportunistes.
+- AcademicTransfer: actif sans cle durable; token public extrait de Nuxt, endpoint JSON, filtre strict PhD/doctoral + AI/data/software et salaires mensuels normalisables.
+- WeWorkRemotely, SwissDevJobs, GermanTechJobs: actifs via RSS public; gardes parce qu'ils ajoutent un signal different et testable, pas seulement du volume generaliste.
 - Jooble: actif, bon complement multi-pays.
 - Greenhouse, Lever, Ashby: actifs via endpoints publics, meilleur ratio fiabilite/volume pour entreprises tech/IA.
-- SmartRecruiters, Workable, Recruitee, Personio XML: supportes par le code pour ajouts ponctuels.
-- Cohere, ElevenLabs, Synthesia, Stability AI, Modal et Poolside: ajoutes apres verification endpoint live.
+- SmartRecruiters: support durci avec queries, pagination, detail fetch, URLs humaines, skip offres inactives/internes, dedupe et filtres optionnels de titres.
+- Workable, Recruitee, Personio XML: supportes par le code pour ajouts ponctuels.
+- HubSpot, Cohere, ElevenLabs, Synthesia, Stability AI, Modal, Poolside, H Company, Dust, Qdrant, Nabla, Doctolib et Delivery Hero: ajoutes apres verification endpoint live ou smoke cible.
 - OpenAI Ashby: actif avec timeout specifique a 90 s, car le feed officiel est volumineux.
 - SerpAPI Google Jobs: desactive volontairement; quota trop faible.
 - VDAB: desactive volontairement; acces public/partenaire bloque, pas une action restante.
-- Adzuna: optionnel; moins prioritaire que les sources officielles/ATS deja actives.
+- Adzuna: configure en option multi-pays, mais inactif sans credentials. A activer seulement si les cles sont disponibles et si le ratio signal/bruit est bon au smoke.
 - LLM judge OpenAI-compatible: implemente avec `gpt-5.4-mini`, effort `high`, batchs de 5 pour eviter les timeouts proxy.
 
 ## Garde-Fous Mis En Place
 
 - Credentials uniquement dans `config/.env`, ignore par git.
 - Pas de `.venv` projet; JobSpy tourne via `uv run --isolated --no-project`.
+- JobSpy Direct est borne par `timeout_seconds = 240` et le process tree est tue au timeout; c'est un fallback Indeed, pas un blocage du pipeline.
 - Dedupe soft/loose avec priorite aux sources officielles/ATS.
-- Filtrage marche: France, Irlande, Suisse, Belgique, Singapour, Pays-Bas, Luxembourg, UK, Allemagne, Remote Europe.
-- Correction de geographie pour eviter les faux positifs type `US-CA-Dublin`.
+- Filtrage marche: France, Irlande, Suisse, Belgique, Singapour, Pays-Bas, Luxembourg, UK, Allemagne, Autriche, Suede, Danemark, Norvege, Finlande, Espagne, Portugal, Estonie, Pologne, Tchequie, Remote Europe.
+- Correction de geographie pour eviter les faux positifs type `US-CA-Dublin`, `gent` dans `agentic` ou `uk` dans `Ukraine`.
 - Penalites titre pour roles non coeur: product/program manager, account, business development, customer success, marketing, recruiting, solution/support engineering.
 - Penalites de niveau pour profil junior/new-grad: senior, lead, principal, architect, VP, et exigences 3+/5+ ans.
 - Requetes sources FR/EN: `Ingénieur IA`, `Ingénieur Data`, `Machine Learning Engineer`, `Data Scientist`.
@@ -77,6 +89,11 @@ Dernier run complet valide: **2026-05-08 18:49 Europe/Paris**.
 - Le script quotidien synchronise un ledger multi-run dedupe entre les liens et l'audit.
 - `runs/latest/jobs.sqlite` reste un snapshot du run courant; les offres pertinentes anciennes sont conservees dans `runs/history/job_history.sqlite` avec `first_seen`, `last_seen`, `seen_count`, `absent_count`, `presence_status`, dernier statut lien et derniere priorite LLM.
 - La queue expose `start_date_check = compatible | too_soon | unknown` comme signal soft, plus `application_messages.md`, `history_dashboard.md` et `weekly_digest.md`.
+- La queue, le judge, l'audit, les exports et SQLite exposent aussi `deadline`, `language_check`, `remote_location_validity` et `salary_normalized_annual_eur`.
+- Le judge recoit aussi `required_years`, `experience_check` et `experience_evidence`; les `too_senior`/`too_junior` sont retires de la queue actionnable.
+- Le scoring expose `doctoral_scope`: bonus leger pour CIFRE/industrial PhD, penalite explicite pour doctorat academique sans salaire/entreprise clair. Cela garde les PhD utiles visibles sans les laisser depasser les jobs/VIE/graduate mieux alignes.
+- Les salaires non EUR sont normalises en estimation annuelle EUR pour le tri, sans masquer la devise d'origine.
+- Les remote US-only/localisation incompatible sont penalises; les cas `restricted` restent en verification humaine.
 - Le judge LLM logge la progression par batch et `run_daily.ps1` expose `-JudgeTimeoutSeconds`; pour un run ponctuel large, `JudgeLimit 200` + `JudgeEffort medium` est plus stable que `high` sur le gateway actuel.
 - Les exports CSV neutralisent les formules Excel et le dashboard n'accepte que des liens HTTP(S).
 - Les erreurs HTTP redigent secrets en query/path/body.
@@ -85,9 +102,12 @@ Dernier run complet valide: **2026-05-08 18:49 Europe/Paris**.
 ## Reste A Faire
 
 - `P0`: aucun blocage runtime detecte sur le dernier run complet.
-- `P1`: verifier manuellement les 62 liens `browser_required` avant candidature, surtout Indeed/JobSpy et pages protegees Ashby.
+- `P1`: verifier manuellement les 43 liens `browser_required` avant candidature, surtout Indeed/JobSpy et pages protegees Ashby.
+- `P1`: verifier manuellement les 11 liens `needs_review/server_error` avant candidature.
 - `P1`: verifier manuellement salaire et remote quand l'offre ne publie pas l'information ou quand le LLM marque `unknown`/`weak`.
 - `P2`: confirmer avec RH les dates de demarrage `unknown`/`too_soon`; ne pas filtrer automatiquement sur ce signal.
+- `P2`: traiter `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux de tri et de verification; `too_senior` doit rester hors queue actionnable sauf signal junior/all-levels explicite.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
-- `P3`: demarrer `rainmanjam/jobspy-api` en Docker seulement si tu veux une API JobSpy permanente au lieu du mode uv direct.
-- `PN`: VDAB direct et SerpAPI ne sont plus des pistes actives. On les garde hors scope tant que l'acces VDAB reste bloque et tant que le quota SerpAPI reste trop faible.
+- `P3`: demarrer `rainmanjam/jobspy-api` en Docker seulement si tu veux une API JobSpy permanente au lieu du mode uv direct; le mode direct est maintenant timeout-borne.
+- `P3`: DevITJobs-like/Wellfound/ABG/Campus France Doctorat/DAAD restent des tests ponctuels possibles, mais ne sont pas prioritaires apres l'ajout EURAXESS + Doctorat.gouv.fr + AcademicTransfer + RSS tech.
+- `PN`: VDAB direct, SerpAPI, Glassdoor JobSpy, ANRT sans compte, EURES API, JobsIreland API et Veolia large ne sont plus des pistes actives. On les garde hors scope tant que l'acces/ratio signal-bruit ne change pas.

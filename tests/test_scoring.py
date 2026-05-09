@@ -4,7 +4,15 @@ import unittest
 
 from jobradai.config import load_config
 from jobradai.models import Job
-from jobradai.scoring import _annual_salary_estimate, _tokens, infer_market, score_jobs
+from jobradai.scoring import (
+    _annual_salary_estimate,
+    _required_years,
+    _tokens,
+    experience_requirement,
+    infer_market,
+    salary_normalization,
+    score_jobs,
+)
 
 
 class ScoringTests(unittest.TestCase):
@@ -107,6 +115,52 @@ class ScoringTests(unittest.TestCase):
         self.assertFalse(any(reason == "Penalite: graduate" for reason in scored.reasons))
         self.assertTrue(any("new-grad" in reason or "graduate" in reason.lower() for reason in scored.reasons))
 
+    def test_cifre_ai_doctorate_is_scored_as_research_opportunity_not_internship(self) -> None:
+        job = Job(
+            source="test",
+            source_type="official_api",
+            title="Doctorant CIFRE IA - Machine Learning",
+            company="Example AI",
+            url="https://example.com/cifre-ai",
+            location="Paris, France",
+            description=(
+                "Convention industrielle de formation par la recherche with an R&D team. "
+                "Applied research on explainability, LLM evaluation, Python, SQL and machine learning."
+            ),
+        )
+        [scored] = score_jobs([job], self.config.profile, self.config.markets)
+        self.assertGreater(scored.score_parts["early_career"], 80)
+        self.assertGreater(scored.score_parts["technical"], 35)
+        self.assertGreater(scored.score_parts["role"], 80)
+        self.assertFalse(any("Stage/alternance" in reason for reason in scored.reasons))
+        self.assertTrue(any("CIFRE" in reason or "recherche" in reason.lower() for reason in scored.reasons))
+
+    def test_academic_doctorate_stays_opportunistic_below_industrial_cifre(self) -> None:
+        academic = Job(
+            source="Doctorat.gouv.fr",
+            source_type="official_api",
+            title="PhD Candidate Machine Learning and LLM Evaluation",
+            company="University Lab",
+            url="https://example.com/phd",
+            location="Paris, France",
+            description="University doctoral research in machine learning, LLM evaluation, Python and deep learning.",
+        )
+        industrial = Job(
+            source="Doctorat.gouv.fr",
+            source_type="official_api",
+            title="Doctorant CIFRE IA - Machine Learning",
+            company="Example AI",
+            url="https://example.com/cifre-ai",
+            location="Paris, France",
+            description="CIFRE with an R&D team on LLM evaluation, Python and machine learning.",
+        )
+        scored = score_jobs([academic, industrial], self.config.profile, self.config.markets)
+        by_url = {job.url: job for job in scored}
+        self.assertLess(by_url["https://example.com/phd"].score, by_url["https://example.com/cifre-ai"].score)
+        self.assertLess(by_url["https://example.com/phd"].score_parts["doctoral_scope"], 0)
+        self.assertGreater(by_url["https://example.com/cifre-ai"].score_parts["doctoral_scope"], 0)
+        self.assertTrue(any("opportuniste" in reason.lower() for reason in by_url["https://example.com/phd"].reasons))
+
     def test_senior_five_year_role_is_level_penalized_for_junior_profile(self) -> None:
         junior = Job(
             source="test",
@@ -134,10 +188,40 @@ class ScoringTests(unittest.TestCase):
             by_url["https://example.com/senior-ml"].score_parts["role"],
         )
 
+    def test_required_years_handles_at_least_and_qualified_experience_phrasing(self) -> None:
+        self.assertEqual(
+            _required_years("You are a backend engineer with at least 5 years of professional experience."),
+            5,
+        )
+        self.assertEqual(
+            _required_years("Minimum of 3 years experience with modern scripting languages."),
+            3,
+        )
+        self.assertEqual(
+            _required_years("2+ years of relevant engineering experience building AI products."),
+            2,
+        )
+        requirement = experience_requirement(
+            "Senior AI Engineer",
+            "You are a backend engineer with at least 5 years of professional experience.",
+        )
+        self.assertEqual(requirement.required_years, 5)
+        self.assertEqual(requirement.check, "too_senior")
+        self.assertIn("5 years", requirement.evidence)
+
     def test_salary_monthly_is_annualized_against_minimum(self) -> None:
         self.assertEqual(_annual_salary_estimate("Mensuel de 2800 Euros a 3500 Euros"), 42000)
         self.assertEqual(_annual_salary_estimate("Annuel de 35000.0 Euros a 50000.0 Euros"), 50000)
         self.assertEqual(_annual_salary_estimate("Annuel de 52 000,00 Euros a 57 000,00 Euros"), 57000)
+
+    def test_salary_normalization_converts_common_currencies(self) -> None:
+        swiss = salary_normalization("Salary: CHF 80'000 - 110'000 per year")
+        self.assertEqual(swiss.currency, "CHF")
+        self.assertEqual(swiss.period, "annual")
+        self.assertEqual(swiss.annual_eur, 113300)
+        german = salary_normalization("Salary: 60.000 - 100.000 € per year")
+        self.assertEqual(german.currency, "EUR")
+        self.assertEqual(german.annual_eur, 100000)
         job = Job(
             source="test",
             source_type="official_api",
@@ -202,6 +286,37 @@ class ScoringTests(unittest.TestCase):
         )
         market = infer_market(job, self.config.markets["markets"])
         self.assertEqual(market.key, "other")
+
+    def test_infer_market_does_not_match_alias_substrings(self) -> None:
+        jobs = [
+            Job(
+                source="test",
+                source_type="ats",
+                title="Applied AI Engineer",
+                company="Example",
+                url="https://example.com/agentic",
+                location="Budapest, Hungary",
+                tags=["Agentic AI"],
+            ),
+            Job(
+                source="test",
+                source_type="ats",
+                title="Account Manager Ukraine",
+                company="Example",
+                url="https://example.com/ukraine",
+                location="Kyiv, Ukraine",
+            ),
+            Job(
+                source="test",
+                source_type="ats",
+                title="Backend Engineer",
+                company="Example",
+                url="https://example.com/argentina",
+                location="Buenos Aires, Argentina",
+            ),
+        ]
+        markets = [infer_market(job, self.config.markets["markets"]).key for job in jobs]
+        self.assertEqual(markets, ["other", "other", "other"])
 
     def test_vie_indemnity_is_not_scored_like_cdi_gross_salary(self) -> None:
         job = Job(

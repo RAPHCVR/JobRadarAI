@@ -11,7 +11,9 @@ from typing import Any
 from jobradai.early_career import early_career_signal
 from jobradai.enrichment import (
     build_recruiter_message,
+    effective_language_check,
     effective_remote_check,
+    effective_remote_location_validity,
     effective_salary_check,
     effective_start_date_check,
 )
@@ -32,15 +34,19 @@ CREATE TABLE IF NOT EXISTS job_history (
   company TEXT NOT NULL,
   url TEXT NOT NULL,
   location TEXT,
+  deadline TEXT,
   market TEXT,
   source TEXT,
   source_type TEXT,
   score REAL,
+  salary_normalized_annual_eur REAL,
   last_priority TEXT,
   last_combined_score REAL,
   last_level_fit TEXT,
   last_salary_check TEXT,
   last_remote_check TEXT,
+  last_language_check TEXT,
+  last_remote_location_validity TEXT,
   last_start_date_check TEXT,
   last_start_date_evidence TEXT,
   last_application_angle TEXT,
@@ -219,6 +225,12 @@ def _upsert_current_job(
     remote_check = effective_remote_check(job, shortlist_item)
     if remote_check == "unknown" and existing and existing["last_remote_check"]:
         remote_check = str(existing["last_remote_check"])
+    language_check = effective_language_check(job, shortlist_item)
+    if language_check == "unknown" and existing and existing["last_language_check"]:
+        language_check = str(existing["last_language_check"])
+    remote_location_validity = effective_remote_location_validity(job, shortlist_item, profile)
+    if remote_location_validity == "unknown" and existing and existing["last_remote_location_validity"]:
+        remote_location_validity = str(existing["last_remote_location_validity"])
     start_date_check, start_date_evidence = effective_start_date_check(job, shortlist_item, profile)
     if start_date_check == "unknown" and existing and existing["last_start_date_check"]:
         start_date_check = str(existing["last_start_date_check"])
@@ -232,17 +244,20 @@ def _upsert_current_job(
             "last_start_date_check": start_date_check,
             "last_salary_check": salary_check,
             "last_remote_check": remote_check,
+            "last_language_check": language_check,
+            "last_remote_location_validity": remote_location_validity,
         }
     )
     conn.execute(
         """
         INSERT INTO job_history (
           stable_id, first_seen, last_seen, seen_count, absent_count, presence_status, last_run,
-          title, company, url, location, market, source, source_type, score,
+          title, company, url, location, deadline, market, source, source_type, score, salary_normalized_annual_eur,
           last_priority, last_combined_score, last_level_fit, last_salary_check, last_remote_check,
+          last_language_check, last_remote_location_validity,
           last_start_date_check, last_start_date_evidence, last_application_angle, last_recruiter_message, last_llm_seen,
           last_link_status, last_link_http_status, last_link_checked_at, last_link_reason, payload_json
-        ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(stable_id) DO UPDATE SET
           last_seen=excluded.last_seen,
           seen_count=excluded.seen_count,
@@ -253,15 +268,19 @@ def _upsert_current_job(
           company=excluded.company,
           url=excluded.url,
           location=excluded.location,
+          deadline=excluded.deadline,
           market=excluded.market,
           source=excluded.source,
           source_type=excluded.source_type,
           score=excluded.score,
+          salary_normalized_annual_eur=excluded.salary_normalized_annual_eur,
           last_priority=excluded.last_priority,
           last_combined_score=excluded.last_combined_score,
           last_level_fit=excluded.last_level_fit,
           last_salary_check=excluded.last_salary_check,
           last_remote_check=excluded.last_remote_check,
+          last_language_check=excluded.last_language_check,
+          last_remote_location_validity=excluded.last_remote_location_validity,
           last_start_date_check=excluded.last_start_date_check,
           last_start_date_evidence=excluded.last_start_date_evidence,
           last_application_angle=excluded.last_application_angle,
@@ -284,15 +303,19 @@ def _upsert_current_job(
             str(job.get("company") or ""),
             str(job.get("url") or ""),
             str(job.get("location") or ""),
+            str(job.get("deadline") or ""),
             str(job.get("market") or ""),
             str(job.get("source") or ""),
             str(job.get("source_type") or ""),
             _float_or_none(job.get("score")),
+            _float_or_none(job.get("salary_normalized_annual_eur")),
             priority,
             combined_score,
             str((shortlist_item or {}).get("level_fit") or (existing["last_level_fit"] if existing else "") or ""),
             salary_check,
             remote_check,
+            language_check,
+            remote_location_validity,
             start_date_check,
             start_date_evidence,
             application_angle,
@@ -403,6 +426,7 @@ def _queue_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         SELECT *
         FROM job_history
         WHERE presence_status != 'expired'
+          AND COALESCE(last_level_fit, '') NOT IN ('too_senior', 'too_junior')
           AND (
             last_priority IN ('apply_now', 'shortlist', 'maybe')
             OR score >= 75
@@ -432,6 +456,9 @@ def _queue_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
         item["early_career_structured"] = bool(early_signal.get("structured_program"))
         item["early_career_signals"] = early_signal.get("signals", [])
         item["early_career_risks"] = early_signal.get("risks", [])
+        item["required_years"] = job_payload.get("required_years")
+        item["experience_check"] = job_payload.get("experience_check") or "unknown"
+        item["experience_evidence"] = job_payload.get("experience_evidence") or ""
         priority = str(item.get("last_priority") or "")
         score = float(item.get("score") or 0)
         if priority in RELEVANT_PRIORITIES:
@@ -483,6 +510,9 @@ def _queue_markdown(result: dict[str, Any]) -> str:
         lines.append(
             f"- `{status}` link `{link_status}` | {score:.1f} | fit `{item.get('early_career_fit')}` "
             f"`{structured}` | start `{item.get('last_start_date_check') or 'unknown'}` | "
+            f"niveau `{item.get('last_level_fit') or 'unknown'}` | "
+            f"exp `{item.get('experience_check') or 'unknown'}`/{item.get('required_years') or 'n/a'}y | "
+            f"deadline `{item.get('deadline') or 'n/a'}` | langue `{item.get('last_language_check') or 'unknown'}` | "
             f"{item.get('title')} - {item.get('company')} | {item.get('market')} | {item.get('url')}"
         )
         lines.append(f"  - Signaux: {signals}")
@@ -506,8 +536,13 @@ def _queue_markdown(result: dict[str, Any]) -> str:
             lines.append(
                 f"- `{status}` link `{link_status}` | {score:.1f} | "
                 f"start `{item.get('last_start_date_check') or 'unknown'}` | "
+                f"niveau `{item.get('last_level_fit') or 'unknown'}` | "
+                f"exp `{item.get('experience_check') or 'unknown'}`/{item.get('required_years') or 'n/a'}y | "
                 f"salaire `{item.get('last_salary_check') or 'unknown'}` | "
                 f"remote `{item.get('last_remote_check') or 'unknown'}` | "
+                f"langue `{item.get('last_language_check') or 'unknown'}` | "
+                f"remote/localisation `{item.get('last_remote_location_validity') or 'unknown'}` | "
+                f"deadline `{item.get('deadline') or 'n/a'}` | "
                 f"{item.get('title')} - {item.get('company')} | {item.get('market')} | "
                 f"{item.get('url')}"
             )
@@ -543,6 +578,10 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
     columns = {str(row[1]) for row in conn.execute("PRAGMA table_info(job_history)")}
     additions = {
         "last_absent_run": "TEXT",
+        "deadline": "TEXT",
+        "salary_normalized_annual_eur": "REAL",
+        "last_language_check": "TEXT",
+        "last_remote_location_validity": "TEXT",
         "last_start_date_check": "TEXT",
         "last_start_date_evidence": "TEXT",
         "last_application_angle": "TEXT",
@@ -717,6 +756,12 @@ def _application_messages(result: dict[str, Any]) -> dict[str, Any]:
             "start_date_check": item.get("last_start_date_check") or "unknown",
             "salary_check": item.get("last_salary_check") or "unknown",
             "remote_check": item.get("last_remote_check") or "unknown",
+            "language_check": item.get("last_language_check") or "unknown",
+            "remote_location_validity": item.get("last_remote_location_validity") or "unknown",
+            "required_years": item.get("required_years"),
+            "experience_check": item.get("experience_check") or "unknown",
+            "experience_evidence": item.get("experience_evidence") or "",
+            "deadline": item.get("deadline") or "",
             "application_angle": item.get("last_application_angle") or "",
             "message": item.get("last_recruiter_message") or build_recruiter_message(item),
         }
@@ -747,7 +792,7 @@ def _application_messages_markdown(result: dict[str, Any]) -> str:
                 f"## {index}. {item.get('title')} - {item.get('company')}",
                 "",
                 f"- Bucket: `{item.get('queue_bucket')}` | Marche: `{item.get('market')}`",
-                f"- Checks: start `{item.get('start_date_check')}` | salaire `{item.get('salary_check')}` | remote `{item.get('remote_check')}`",
+                f"- Checks: start `{item.get('start_date_check')}` | salaire `{item.get('salary_check')}` | remote `{item.get('remote_check')}` | langue `{item.get('language_check')}` | remote/localisation `{item.get('remote_location_validity')}` | experience `{item.get('experience_check')}`/{item.get('required_years') or 'n/a'}y | deadline `{item.get('deadline') or 'n/a'}`",
                 f"- URL: {item.get('url')}",
                 "",
                 "```text",

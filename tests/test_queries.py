@@ -30,6 +30,21 @@ class QuerySelectionTests(unittest.TestCase):
         self.assertNotIn("_index", item)
         self.assertEqual(item["category"], "early_career")
 
+    def test_doctoral_queries_are_kept_as_early_specialty(self) -> None:
+        config = {
+            "queries": [
+                {"term": "LLM Engineer", "priority": 10},
+                {"term": "Applied AI Engineer", "priority": 10},
+                {"term": "Data Engineer", "priority": 9},
+                {"term": "CIFRE IA", "priority": 7},
+            ]
+        }
+        selected = select_query_items(config, limit=3, early_career_min=1)
+        terms = [item["term"] for item in selected]
+        self.assertIn("CIFRE IA", terms)
+        doctoral = next(item for item in selected if item["term"] == "CIFRE IA")
+        self.assertEqual(doctoral["category"], "research_doctoral")
+
 
 if __name__ == "__main__":
     unittest.main()

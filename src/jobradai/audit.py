@@ -116,7 +116,7 @@ def build_audit(
     vie_jobs = [job for job in jobs if _is_vie_job(job)]
     salary_jobs = [job for job in jobs if job.get("salary") and not _is_vie_job(job)]
     salary_meets = [
-        job for job in salary_jobs if (_annual_salary_estimate(str(job.get("salary") or "")) or 0) >= minimum_salary
+        job for job in salary_jobs if (_job_annual_eur(job) or 0) >= minimum_salary
     ]
     remote_signal = [job for job in jobs if _has_remote_signal(job)]
     top30 = jobs[:30]
@@ -153,9 +153,18 @@ def build_audit(
                     job
                     for job in top30
                     if not _is_vie_job(job)
-                    and (_annual_salary_estimate(str(job.get("salary") or "")) or 0) >= minimum_salary
+                    and (_job_annual_eur(job) or 0) >= minimum_salary
                 ]
             ),
+        },
+        "structured_signals": {
+            "with_deadline": len([job for job in jobs if job.get("deadline")]),
+            "language_check_counts": dict(Counter(str(job.get("language_check") or "unknown") for job in jobs)),
+            "remote_location_validity_counts": dict(Counter(str(job.get("remote_location_validity") or "unknown") for job in jobs)),
+            "salary_currency_counts": dict(Counter(str(job.get("salary_currency") or "unknown") for job in salary_jobs)),
+            "normalized_salary_count": len([job for job in salary_jobs if job.get("salary_normalized_annual_eur") is not None]),
+            "experience_check_counts": dict(Counter(str(job.get("experience_check") or "unknown") for job in jobs)),
+            "required_years_count": len([job for job in jobs if job.get("required_years") is not None]),
         },
         "vie": _vie_summary(vie_jobs),
         "language_market": _language_market_rows(by_market, markets),
@@ -201,7 +210,7 @@ def build_audit(
 
 def _application_queue_summary(application_queue: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(application_queue, dict) or not application_queue:
-        return {"available": False, "queue_count": 0, "start_date_counts": {}, "salary_counts": {}, "remote_counts": {}}
+        return {"available": False, "queue_count": 0, "start_date_counts": {}, "salary_counts": {}, "remote_counts": {}, "language_counts": {}, "remote_location_counts": {}}
     items = [item for item in application_queue.get("items", []) if isinstance(item, dict)]
     return {
         "available": True,
@@ -211,6 +220,8 @@ def _application_queue_summary(application_queue: dict[str, Any]) -> dict[str, A
         "start_date_counts": dict(Counter(str(item.get("last_start_date_check") or "unknown") for item in items)),
         "salary_counts": dict(Counter(str(item.get("last_salary_check") or "unknown") for item in items)),
         "remote_counts": dict(Counter(str(item.get("last_remote_check") or "unknown") for item in items)),
+        "language_counts": dict(Counter(str(item.get("last_language_check") or "unknown") for item in items)),
+        "remote_location_counts": dict(Counter(str(item.get("last_remote_location_validity") or "unknown") for item in items)),
     }
 
 
@@ -234,6 +245,8 @@ def _graduate_summary(
                 "score": job.get("score", 0),
                 "fit": fit,
                 "structured_program": bool(signal.get("structured_program")),
+                "doctoral_program": bool(signal.get("doctoral_program")),
+                "industrial_doctoral": bool(signal.get("industrial_doctoral")),
                 "url": job.get("url", ""),
             }
         )
@@ -250,6 +263,8 @@ def _graduate_summary(
         "detected": len(rows),
         "target_detected": len([row for row in rows if row["fit"] in {"high", "medium"}]),
         "structured_detected": len([row for row in rows if row["structured_program"]]),
+        "doctoral_detected": len([row for row in rows if row["doctoral_program"]]),
+        "industrial_doctoral_detected": len([row for row in rows if row["industrial_doctoral"]]),
         "fit_counts": dict(Counter(str(row["fit"]) for row in rows)),
         "queue_target_count": len(queue_early),
         "llm_target_count": len(shortlist_early),
@@ -425,6 +440,16 @@ def _vie_summary(jobs: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _job_annual_eur(job: dict[str, Any]) -> float | None:
+    value = job.get("salary_normalized_annual_eur")
+    try:
+        if value is not None:
+            return float(value)
+    except (TypeError, ValueError):
+        pass
+    return _annual_salary_estimate(str(job.get("salary") or ""))
+
+
 def _language_fit(market: str, language_score: float) -> str:
     if market in {"france", "ireland", "uk", "singapore", "remote_europe"}:
         return "fort: francais/anglais compatible"
@@ -495,6 +520,12 @@ def _p_items(
                 "item": "Utiliser start_date_check comme signal soft: confirmer avec RH les dates unknown/too_soon, sans skipper automatiquement.",
             }
         )
+    items.append(
+        {
+            "priority": "P2",
+            "item": "Utiliser deadline, language_check, remote_location_validity, required_years, experience_check et salary_normalized_annual_eur comme signaux soft; hard-filter seulement remote explicitement incompatible, langue locale obligatoire non compensee ou too_senior sans signal junior/all-levels.",
+        }
+    )
     if "vdab_generic" in skipped:
         missing_belgium_public = [name for name in ("forem", "actiris") if name not in ok_names]
         if missing_belgium_public:
@@ -545,6 +576,8 @@ def _audit_markdown(report: dict[str, Any]) -> str:
         f"- Sources OK: **{report['source_status']['ok']}** | ignorees: **{report['source_status']['skipped']}** | erreurs: **{len(report['source_status']['errors'])}**",
         f"- Remote/hybride detecte: **{report['remote']['all_with_signal']}** ({report['remote']['all_share']}%)",
         f"- Salaire publie hors VIE: **{report['salary']['all_with_salary']}** ({report['salary']['all_with_salary_share']}%), dont >= {report['salary']['minimum_eur']:.0f} EUR: **{report['salary']['all_meeting_minimum']}**",
+        f"- Deadlines publiees: **{report['structured_signals']['with_deadline']}** | salaires normalises EUR/an: **{report['structured_signals']['normalized_salary_count']}**",
+        f"- Annees d'experience extraites: **{report['structured_signals']['required_years_count']}**",
         f"- VIE Business France retenus: **{report['vie']['count']}**",
         "",
         "## Marches Et Langues",
@@ -554,6 +587,12 @@ def _audit_markdown(report: dict[str, Any]) -> str:
         lines.append(
             f"- `{row['market']}`: {row['count']} offres | praticite {row['practicality_score']} | salaire {row['salary_score']} | visa {row['visa_score']} | langue {row['language_score']} - {row['notes']}"
         )
+    lines.extend(["", "## Signaux Structures", ""])
+    structured = report["structured_signals"]
+    lines.append(f"- Langues: `{structured['language_check_counts']}`")
+    lines.append(f"- Remote/localisation: `{structured['remote_location_validity_counts']}`")
+    lines.append(f"- Experience: `{structured['experience_check_counts']}`")
+    lines.append(f"- Devises salaire: `{structured['salary_currency_counts']}`")
     lines.extend(["", "## VIE", ""])
     vie = report["vie"]
     if vie["count"]:
@@ -587,9 +626,9 @@ def _audit_markdown(report: dict[str, Any]) -> str:
     else:
         lines.append("- Judge LLM non encore execute.")
     graduate = report["graduate_programs"]
-    lines.extend(["", "## Graduate / Early Careers", ""])
+    lines.extend(["", "## Graduate / Early Careers / Doctoral", ""])
     lines.append(
-        f"- Signaux detectes: **{graduate['detected']}** | high/medium: **{graduate['target_detected']}** | structures: **{graduate['structured_detected']}** | LLM: **{graduate['llm_target_count']}** | queue: **{graduate['queue_target_count']}**"
+        f"- Signaux detectes: **{graduate['detected']}** | high/medium: **{graduate['target_detected']}** | structures: **{graduate['structured_detected']}** | doctorats/CIFRE: **{graduate.get('doctoral_detected', 0)}** dont industriels/CIFRE: **{graduate.get('industrial_doctoral_detected', 0)}** | LLM: **{graduate['llm_target_count']}** | queue: **{graduate['queue_target_count']}**"
     )
     lines.append(f"- Fits: `{graduate['fit_counts']}` | priorites LLM: `{graduate['llm_target_priority_counts']}`")
     for item in graduate["top"][:8]:
@@ -612,7 +651,7 @@ def _audit_markdown(report: dict[str, Any]) -> str:
             f"- Queue dedupee: **{queue['queue_count']}** | priorites: `{queue.get('priority_counts', {})}` | statuts: `{queue.get('status_counts', {})}`"
         )
         lines.append(
-            f"- Checks queue: start `{queue.get('start_date_counts', {})}` | salaire `{queue.get('salary_counts', {})}` | remote `{queue.get('remote_counts', {})}`"
+            f"- Checks queue: start `{queue.get('start_date_counts', {})}` | salaire `{queue.get('salary_counts', {})}` | remote `{queue.get('remote_counts', {})}` | langue `{queue.get('language_counts', {})}` | remote/localisation `{queue.get('remote_location_counts', {})}`"
         )
     else:
         lines.append("- Queue multi-run non encore generee.")

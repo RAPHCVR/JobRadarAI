@@ -111,18 +111,20 @@ $env:PYTHONPATH = "src"
 uv run --no-project --with-editable . -- python -m jobradai sources
 ```
 
-Digest graduate/early-careers seul:
+Digest graduate/early-careers/doctorats seul:
 
 ```powershell
 $env:PYTHONPATH = "src"
 uv run --no-project --with-editable . -- python -m jobradai graduate-digest
 ```
 
+JobSpy Direct est un fallback Indeed controle. Il est borne par `jobspy_direct.timeout_seconds` dans `config/sources.toml`; si ce timeout est atteint, le run continue avec une source en erreur/skip au lieu de rester bloque.
+
 ## Lire Les Resultats
 
 1. Ouvrir `runs/latest/dashboard.html`.
 2. Lire `runs/latest/llm_shortlist.md` pour la shortlist finale.
-3. Lire `runs/latest/graduate_programs.md` si tu veux verifier les graduate programmes/new-grad sans en faire le filtre principal.
+3. Lire `runs/latest/graduate_programs.md` si tu veux verifier les graduate programmes/new-grad/CIFRE sans en faire le filtre principal.
 4. Lire `runs/latest/application_queue.md` pour la queue dedupee multi-run.
 5. Lire `runs/latest/application_messages.md` pour les brouillons RH a valider manuellement.
 6. Lire `runs/latest/link_checks.md` avant de candidater.
@@ -190,7 +192,7 @@ Commande directe:
 
 Modes de selection:
 
-- `balanced`: recommande; mix top global, VIE, graduate/early-career technique et couverture marches.
+- `balanced`: recommande; mix top global, VIE, graduate/early-career/doctorat industriel technique et couverture marches.
 - `top`: top local pur.
 - `vie`: uniquement VIE, trie par fit technique/role.
 - `all`: tout le corpus exporte; utile pour une passe exhaustive mais lent.

@@ -1,67 +1,39 @@
 # JobRadarAI
 
-Radar local pour trouver, filtrer et classer des offres **data / IA / LLM orchestration / recherche appliquee** sur France, Europe, Irlande, Suisse, Belgique et Singapour.
+Radar local pour trouver, filtrer et classer des offres **data / IA / LLM orchestration / recherche appliquee** sur France, Europe elargie, Irlande, Suisse, Belgique, Allemagne, Nordics, UK et Singapour.
 
-L'objectif est pragmatique:
+Le projet est volontairement local et humain-dans-la-boucle:
 
-- utiliser d'abord des sources propres: APIs publiques, ATS directs, sources officielles;
-- garder les scrapers et LinkedIn en fallback controle, jamais en auto-apply massif;
-- scorer les offres selon le fit technique, la praticite marche, la langue, le visa, le salaire, le remote et les missions **VIE**;
-- traiter les roles **graduate / new-grad / early-careers** comme un signal soft dedie quand ils restent data/IA/software, sans filtrer le corpus principal sur ce critere;
-- produire des exports exploitables sans dependance lourde: HTML, Markdown, CSV, JSON, SQLite;
-- garder un historique date des runs pour comparer les resultats dans le temps.
+- sources propres d'abord: APIs officielles, APIs publiques, ATS directs;
+- scrapers seulement en fallback controle;
+- pas de bulk connect, bulk message ou auto-apply LinkedIn;
+- scoring explicable par fit technique, marche, langue, visa, salaire/devise normalisee, remote/localisation, dates, VIE, niveau et annees d'experience requises;
+- judge LLM optionnel pour trier la shortlist finale;
+- exports HTML, Markdown, CSV, JSON et SQLite;
+- ledger multi-run pour conserver les offres pertinentes, detecter les nouvelles, les retours, les stale et les expired.
 
-## Etat Actuel
+## Documentation Canonique
 
-Dernier run valide: **2026-05-08 21:34 Europe/Paris**, lance manuellement en mode complet apres elargissement prudent des requetes France Travail/Jooble/JobSpy/Forem/Actiris et durcissement du timeout LLM: collecte, exports, judge LLM elargi, verification liens priority-aware, registre multi-run, audit et snapshot. Les exports valides sont dans `runs/latest`; le snapshot final est `runs/history/final-20260508-expanded-github-ready-v3`.
+- Etat courant et verdict P0-PN: [docs/CURRENT_STATUS.md](docs/CURRENT_STATUS.md).
+- Commandes, run quotidien, judge, link-check, historique et scheduler: [docs/OPERATIONS.md](docs/OPERATIONS.md).
+- Sources actives, sources bloquees, ATS et backlog d'extensions: [docs/SOURCES.md](docs/SOURCES.md).
+- Strategie marche, titres et signaux de scoring: [docs/MARKET_STRATEGY.md](docs/MARKET_STRATEGY.md).
+- Audit best-practice et garde-fous systeme: [docs/BEST_PRACTICE_AUDIT.md](docs/BEST_PRACTICE_AUDIT.md).
+- Index complet des docs: [docs/README.md](docs/README.md).
 
-La tache Windows `JobRadarAI-Daily` est actuellement **desactivee**. Aucun run automatique ne doit partir tant qu'elle n'est pas reactivee manuellement.
+## Etat Court
 
-Resultat runtime du dernier run:
+Dernier full run valide documente: **2026-05-08 21:34 Europe/Paris**.
 
 - 2895 offres retenues.
 - 43 sources OK, 2 sources ignorees attendues, 0 erreur.
-- 364 missions VIE Business France retenues.
-- 1319 offres avec signal remote/hybride, soit 45.6%.
-- 107 offres hors VIE avec salaire publie, dont 81 >= 45000 EUR/an.
-- 200 offres jugees par le LLM en selection `balanced`: 12 `apply_now`, 57 `shortlist`, 32 `maybe`, 99 `skip`; les 7 offres graduate/early-career high/medium du corpus sont incluses.
-- 62 signaux graduate/early-career detectes, dont 7 high/medium; les 7 sont juges par le LLM et remontent dans la queue.
-- 166 liens verifies en mode priority-aware: 112 `direct_ok`, 43 `browser_required`, 11 `needs_review`, 0 `unreachable`.
-- 144 items dans la queue multi-run dedupee `runs/latest/application_queue.md`.
-- 302 nouvelles offres et 358 offres disparues marquees `stale` dans le ledger; 0 lien expire dans l'historique courant.
-- Checks queue: start `{'unknown': 142, 'too_soon': 1, 'compatible': 1}`, salaire `{'below_min': 28, 'unknown': 42, 'meets_or_likely': 74}`, remote `{'meets': 43, 'weak': 101}`.
+- 364 missions VIE Business France.
+- 200 offres jugees par le LLM en mode `balanced`.
+- 166 liens verifies en mode priority-aware.
+- 108 items dans la queue multi-run dedupee.
+- Tache Windows `JobRadarAI-Daily`: **desactivee**.
 
-Le scoring integre `private/main.tex`, le stage Aubay AI Researcher fev. 2026 - juil. 2026, et les contraintes courantes: profil junior/new-grad, minimum 45k EUR/an, preference hybride/remote avec au moins 2 jours de teletravail vises, demarrage cible a partir d'aout/septembre 2026 comme signal soft a confirmer avec RH, preference grandes villes et focus recherche IA/explicabilite mecanistique.
-
-## Sources Actives
-
-Fonctionne sans cle API:
-
-- Business France VIE, source officielle Mon Volontariat International.
-- Le Forem Open Data, via ODWB/Opendatasoft.
-- Actiris, via endpoint JSON du site officiel.
-- Remotive.
-- Arbeitnow.
-- RemoteOK.
-- Jobicy.
-- Himalayas.
-- ATS directs verifies: Databricks, Dataiku, Google DeepMind, Mistral AI, Contentsquare, Intercom, Adyen, Stripe, Anthropic, Scale AI, MongoDB, Celonis, N26, Canonical, GitLab, Elastic, OpenAI, LangChain, Perplexity AI, Cursor, Snowflake, Datadog, Algolia, Qonto, Pigment, Cohere, ElevenLabs, Synthesia, Stability AI, Modal, Poolside, H Company, Dust, Qdrant, Nabla, Doctolib.
-- JobSpy Direct via `uv`, sur Indeed par defaut, sans LinkedIn.
-
-Actif avec credentials locaux:
-
-- France Travail.
-- Jooble.
-
-Ignorees attendues sur le dernier run:
-
-- Adzuna: credentials absents.
-- JobSpy API local: service `http://127.0.0.1:8000` injoignable, remplace par JobSpy Direct.
-
-Mis de cote volontairement:
-
-- VDAB direct: bloque cote acces public/partenaire; le portail OpenServices n'offre pas d'onboarding self-service exploitable ici. On ne le traite plus comme un P restant.
-- SerpAPI Google Jobs: desactive a cause du quota trop faible; a ne pas utiliser en routine.
+Depuis ce full run, des extensions post-run ont ete ajoutees et validees par tests/smoke cibles: Bundesagentur Jobsuche, SmartRecruiters durci, Delivery Hero filtre, correction du matching marche par alias bornes, JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS, Doctorat.gouv.fr, AcademicTransfer, WeWorkRemotely RSS, SwissDevJobs, GermanTechJobs, champs structures `deadline`/`language_check`/`remote_location_validity`/`required_years`/`experience_check`/salaire annualise EUR, extension graduate/early-career/doctorat industriel-CIFRE, et extension opportuniste Autriche/Nordics/Espagne/Portugal/Estonie/Pologne/Tchequie. Les volumes exacts seront mis a jour au prochain full run.
 
 ## Lancer
 
@@ -85,46 +57,7 @@ Run large ponctuel avant une grosse session candidature:
 .\scripts\run_daily.ps1 -Judge -JudgeRequired -JudgeLimit 200 -JudgeBatchSize 5 -JudgeSelectionMode balanced -JudgeEffort medium -JudgeTimeoutSeconds 360
 ```
 
-Ce script fait maintenant, par defaut:
-
-1. collecte + exports;
-2. judge LLM si `-Judge` est passe;
-3. verification de liens;
-4. synchronisation du registre multi-run;
-5. audit P0/P1/P2;
-6. snapshot dans `runs/history/<timestamp>`.
-
-JobSpy est lance via `uv run --isolated --no-project --with python-jobspy==1.1.82`; il n'a pas besoin d'une installation globale et ne cree pas d'environnement projet persistant. La version est pinnee pour eviter une resolution PyPI dynamique non controlee dans la tache quotidienne.
-
-## Exports
-
-- `runs/latest/dashboard.html`
-- `runs/latest/report.md`
-- `runs/latest/jobs.csv`
-- `runs/latest/jobs.json`
-- `runs/latest/jobs.sqlite`
-- `runs/latest/sources.json`
-- `runs/latest/graduate_programs.md`
-- `runs/latest/graduate_programs.json`
-- `runs/latest/llm_shortlist.md`
-- `runs/latest/llm_shortlist.json`
-- `runs/latest/link_checks.md`
-- `runs/latest/link_checks.json`
-- `runs/latest/application_queue.md`
-- `runs/latest/application_queue.json`
-- `runs/latest/application_messages.md`
-- `runs/latest/application_messages.json`
-- `runs/latest/history_dashboard.md`
-- `runs/latest/history_dashboard.json`
-- `runs/latest/weekly_digest.md`
-- `runs/latest/weekly_digest.json`
-- `runs/latest/audit.md`
-- `runs/latest/audit.json`
-- `runs/history/latest.txt`
-- `runs/history/job_history.sqlite`
-- `runs/history/<timestamp>/snapshot.json`
-
-## Tests
+## Tester
 
 ```powershell
 cd C:\Users\Raphael\Documents\JobRadarAI
@@ -132,108 +65,33 @@ $env:PYTHONPATH = "src"
 uv run --no-project --with-editable . -- python -m unittest discover -s tests
 ```
 
-## Configuration
+## Fichiers Importants
 
-- `config/profile.toml`: profil cible, mots-cles forts/faibles, titres pertinents.
-- `config/markets.toml`: scoring marche, praticite, langue, visa, salaire.
-- `config/sources.toml`: sources, requetes, ATS directs.
-- `config/secrets.example.env`: modele de credentials. Copier en `config/.env` si tu veux activer des APIs a cle.
+- `config/profile.toml`: profil cible, contraintes, titres et poids de scoring.
+- `config/markets.toml`: scoring marche, praticite, langue, visa et salaire.
+- `config/sources.toml`: sources, requetes, ATS directs et limites de crawl.
+- `config/secrets.example.env`: modele de credentials; copier en `config/.env` si besoin.
+- `scripts/run_daily.ps1`: orchestration run + judge + link-check + historique + audit + snapshot.
+- `runs/latest/`: exports du dernier run, ignore par git.
+- `runs/history/job_history.sqlite`: ledger multi-run, ignore par git.
 
-Credentials et secrets restent dans `config/.env` ou variables d'environnement, jamais dans le code.
+Les credentials restent dans `config/.env` ou variables d'environnement, jamais dans le code.
 
-## Philosophie De Scoring
+## Sources
 
-Le score final combine:
+Sources propres actives: Business France VIE, France Travail, Forem, Actiris, Bundesagentur Jobsuche, JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS, Doctorat.gouv.fr, AcademicTransfer, Jooble, APIs remote publiques, WeWorkRemotely RSS, SwissDevJobs, GermanTechJobs, ATS directs Greenhouse/Lever/Ashby/SmartRecruiters, requetes opportunistes CIFRE/industrial PhD sur les moteurs existants, et JobSpy Direct sur Indeed en fallback controle.
 
-- fit technique: data engineering, LLM, RAG, MLOps/LLMOps, orchestration, recherche, cloud;
-- role: seniorite et proximite du titre;
-- marche/praticite: Irlande, Suisse, Belgique, Singapour, France, Pays-Bas, Luxembourg, UK, Allemagne, Remote Europe;
-- source: ATS/direct/officiel mieux note que scraper;
-- fraicheur;
-- signal salaire;
-- VIE Business France: indemnite mensuelle traitee a part, car elle n'est pas comparable a un brut annuel CDI;
-- graduate/new-grad/early-careers: bonus faible et explicite si le role est data/IA/software/research; penalite neutralisee pour le label seul, mais les stages/alternances et programmes business restent penalises.
+Sources volontairement hors routine: LinkedIn, VDAB direct, SerpAPI Google Jobs, Glassdoor via JobSpy, ANRT sans compte, ABG, Campus France Doctorat, DAAD/PhDGermany, EURES API, JobsIreland API, Veolia SmartRecruiters large. Welcome to the Jungle est documente comme extension P2 possible via sitemaps + JSON-LD, pas via recherche interne.
 
-Le dashboard et les exports gardent les raisons explicites pour eviter une boite noire.
+Voir [docs/SOURCES.md](docs/SOURCES.md) pour le detail.
 
-## Garde-Fous LinkedIn
+## Garde-Fous
 
-Ce projet ne fait pas de bulk connect, bulk message ou auto-apply LinkedIn. Le mode recommande reste:
-
-- 10 a 20 candidatures tres ciblees par semaine;
-- CV adapte;
-- message recruteur prepare mais valide manuellement;
-- sources ATS/officielles pour les donnees.
-
-## Ajouter Des ATS
-
-Ajouter dans `config/sources.toml`:
-
-```toml
-[[ats_feeds]]
-name = "Example"
-type = "greenhouse"
-url = "https://boards-api.greenhouse.io/v1/boards/example/jobs?content=true"
-markets = ["ireland", "france", "remote_europe"]
-```
-
-Types supportes:
-
-- `greenhouse`
-- `lever`
-- `ashby`
-- `smartrecruiters`
-- `workable`
-- `recruitee`
-- `personio_xml`
-
-Les feeds ATS peuvent definir `timeout = 90` ou `retries = 3` si un board officiel est volumineux. OpenAI utilise cet override car son feed Ashby pese environ 10.7 MB et peut repondre en plus d'une minute.
-
-## Commandes Utiles
-
-Verification liens seule:
-
-```powershell
-.\scripts\run_link_check.ps1
-```
-
-Le link-check verifie les items LLM actionnables `apply_now`/`shortlist`/`maybe`, puis ajoute le top local jusqu'a la limite configuree en ignorant les items deja marques `skip` par le judge courant. Sans shortlist LLM fraiche, il retombe sur le top local.
-
-Audit seul:
-
-```powershell
-.\scripts\run_audit.ps1
-```
-
-Snapshot seul:
-
-```powershell
-.\scripts\snapshot_latest.ps1
-```
-
-Synchronisation historique seule:
-
-```powershell
-.\scripts\sync_history.ps1
-```
-
-Digest graduate/early-careers seul, depuis le `jobs.json` courant:
-
-```powershell
-$env:PYTHONPATH = "src"
-uv run --no-project --with-editable . -- python -m jobradai graduate-digest
-```
-
-Judge seul:
-
-```powershell
-.\scripts\run_judge.ps1 -Limit 120 -BatchSize 5 -SelectionMode balanced -Effort high
-```
-
-Judge large ponctuel:
-
-```powershell
-.\scripts\run_judge.ps1 -Limit 200 -BatchSize 5 -SelectionMode balanced -Effort medium -TimeoutSeconds 360
-```
-
-Le judge ne remplace pas le score local: il sert a corriger les faux positifs de niveau, notamment les offres trop senior/lead/VP, a trier les VIE larges, a garder une couverture graduate/early-careers technique quand elle existe, et a produire un angle de candidature par offre. Le mode `balanced` garde du top global mais force aussi une couverture VIE, early-career et marches cibles.
+- Pas d'action LinkedIn automatisee en masse.
+- Pas de secrets dans le repo.
+- Les sources officielles/ATS priment sur les scrapers.
+- Les exports gardent les raisons de scoring.
+- `start_date_check` reste un signal soft: confirmer avec RH, ne pas auto-skipper.
+- `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et la normalisation devise/salaire sont des signaux de priorisation, pas des hard filters aveugles.
+- Les offres PhD/doctorat sont opportunistes: un CIFRE/industrial PhD data/AI/R&D peut etre shortlist, mais un doctorat academique sans entreprise, salaire ou fit technique clair reste a verifier ou low-fit.
+- Le judge LLM aide a prioriser, mais ne remplace pas la verification humaine avant candidature.

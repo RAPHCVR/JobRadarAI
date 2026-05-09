@@ -19,7 +19,7 @@ def main() -> int:
     max_queries = int(settings.get("max_queries", 6))
     results_wanted = int(settings.get("results_wanted", 12))
     hours_old = int(settings.get("hours_old", 336))
-    sites = list(settings.get("sites", ["indeed", "glassdoor"]))
+    sites = list(settings.get("sites", ["indeed"]))
     if settings.get("include_linkedin") and "linkedin" not in sites:
         sites.append("linkedin")
     locations = settings.get("locations", [])

@@ -5,13 +5,17 @@ import unicodedata
 from datetime import date
 from typing import Any
 
-from jobradai.scoring import _annual_salary_estimate, _vie_monthly_allowance
+from jobradai.models import Job
+from jobradai.scoring import _annual_salary_estimate, _vie_monthly_allowance, experience_requirement, salary_normalization
 from jobradai.text import clean_html, normalize_space, text_blob
 
 
 START_DATE_CHECKS = {"compatible", "too_soon", "unknown"}
 SALARY_CHECKS = {"meets_or_likely", "unknown", "below_min"}
 REMOTE_CHECKS = {"meets", "unknown", "weak"}
+LANGUAGE_CHECKS = {"english_ok", "french_ok", "local_language_required", "unknown"}
+REMOTE_LOCATION_VALIDITY_CHECKS = {"compatible", "restricted", "incompatible", "unknown"}
+EXPERIENCE_CHECKS = {"junior_ok", "stretch", "too_senior", "unknown"}
 
 DEFAULT_TARGET_START_AFTER = date(2026, 8, 1)
 DEFAULT_AVAILABILITY_NOTE = (
@@ -77,6 +81,75 @@ _IMMEDIATE_START_RE = re.compile(
 _MONTH_YEAR_RE = re.compile(rf"\b(?P<month>{_MONTH_RE})\.?\s+(?P<year>20\d{{2}})\b", re.IGNORECASE)
 _YEAR_MONTH_RE = re.compile(r"\b(?P<year>20\d{2})[-/](?P<month>0?[1-9]|1[0-2])\b")
 _RENTREE_RE = re.compile(r"\brentree\s+(?P<year>20\d{2})\b", re.IGNORECASE)
+_LOCAL_LANGUAGE_RE = re.compile(
+    r"\b("
+    r"german|deutsch|allemand|dutch|nederlands|neerlandais|swedish|svenska|suedois|"
+    r"danish|dansk|danois|norwegian|norsk|norvegien|finnish|suomi|finnois|"
+    r"spanish|espanol|espagnol|portuguese|portugues|portugais|polish|polski|"
+    r"czech|cesky|tcheque"
+    r")\b.{0,80}\b(required|mandatory|fluent|native|professional|business|courant|obligatoire|exige|required)\b",
+    re.IGNORECASE,
+)
+_LOCAL_LANGUAGE_PREFIX_RE = re.compile(
+    r"\b(native|fluent|professional|business|courant|de langue)\s+("
+    r"german|deutsch|allemand|dutch|nederlands|swedish|svenska|danish|dansk|"
+    r"norwegian|norsk|finnish|suomi|spanish|espanol|portuguese|portugues|polish|polski|czech|cesky"
+    r")\b|\b(deutschsprachig|german-speaking|dutch-speaking|swedish-speaking|danish-speaking|norwegian-speaking|finnish-speaking|spanish-speaking|portuguese-speaking)\b",
+    re.IGNORECASE,
+)
+_ENGLISH_OK_RE = re.compile(
+    r"\b(english|anglais)\b.{0,80}\b(required|mandatory|fluent|professional|business|working|courant|obligatoire|ok|required)\b"
+    r"|\b(working|professional|fluent|business)\s+english\b",
+    re.IGNORECASE,
+)
+_FRENCH_OK_RE = re.compile(
+    r"\b(french|francais|français)\b.{0,80}\b(required|mandatory|fluent|professional|business|working|courant|obligatoire|ok|required)\b"
+    r"|\b(working|professional|fluent|business)\s+french\b",
+    re.IGNORECASE,
+)
+_REMOTE_INCOMPATIBLE_RE = re.compile(
+    r"\b(remote\s+(us|usa|united states|canada|latam|latin america)\s+only|"
+    r"(must|need|required)\s+.{0,50}\b(based|located|authorized|authorised)\b.{0,50}\b(us|usa|united states|canada|latam|latin america)\b|"
+    r"(remote from|anywhere in|within|based in)\s+(the\s+)?(us|u\.s\.|usa|united states|canada|latam|latin america)\b|"
+    r"\b(us|u\.s\.|usa|united states|canada|latam|latin america)\b.{0,40}\bonly\b|"
+    r"only\s+.{0,40}\b(us|u\.s\.|usa|united states|canada|latam|latin america)\b)\b",
+    re.IGNORECASE,
+)
+_REMOTE_RESTRICTED_RE = re.compile(
+    r"\b(must|need|required|requires?)\s+.{0,50}\b(based|located|resident|reside|right to work)\b"
+    r"|\b(remote from|remote in|based in|within)\b",
+    re.IGNORECASE,
+)
+_REMOTE_COMPATIBLE_RE = re.compile(
+    r"\b(remote europe|remote eu|europe remote|emea|worldwide|anywhere|global remote|hybrid|hybride|teletravail|télétravail)\b",
+    re.IGNORECASE,
+)
+
+
+def populate_structured_job_fields(jobs: list[Job], profile: dict[str, Any] | None = None) -> list[Job]:
+    for job in jobs:
+        salary = salary_normalization(job.salary)
+        if salary.annual_eur is not None:
+            job.salary_currency = job.salary_currency or salary.currency
+            job.salary_period = job.salary_period or salary.period
+            job.salary_min_annual_eur = job.salary_min_annual_eur if job.salary_min_annual_eur is not None else salary.min_annual_eur
+            job.salary_max_annual_eur = job.salary_max_annual_eur if job.salary_max_annual_eur is not None else salary.max_annual_eur
+            job.salary_normalized_annual_eur = (
+                job.salary_normalized_annual_eur if job.salary_normalized_annual_eur is not None else salary.annual_eur
+            )
+        payload = job.as_dict()
+        if job.language_check == "unknown":
+            job.language_check = infer_language_check(payload)
+        if job.remote_location_validity == "unknown":
+            job.remote_location_validity = infer_remote_location_validity(payload, profile)
+        experience = experience_requirement(job.title, job.description, job.employment_type)
+        if job.required_years is None:
+            job.required_years = experience.required_years
+        if job.experience_check == "unknown":
+            job.experience_check = experience.check
+        if not job.experience_evidence:
+            job.experience_evidence = experience.evidence
+    return jobs
 
 
 def infer_start_date_check(job: dict[str, Any], profile: dict[str, Any] | None = None) -> dict[str, str]:
@@ -151,6 +224,64 @@ def effective_remote_check(job: dict[str, Any], shortlist_item: dict[str, Any] |
     return "unknown"
 
 
+def infer_language_check(job: dict[str, Any]) -> str:
+    blob = _strip_accents(_job_text(job)).lower()
+    if not blob:
+        return "unknown"
+    if _LOCAL_LANGUAGE_RE.search(blob) or _LOCAL_LANGUAGE_PREFIX_RE.search(blob):
+        return "local_language_required"
+    if _FRENCH_OK_RE.search(blob):
+        return "french_ok"
+    if _ENGLISH_OK_RE.search(blob):
+        return "english_ok"
+    return "unknown"
+
+
+def effective_language_check(job: dict[str, Any], shortlist_item: dict[str, Any] | None = None) -> str:
+    llm_check = _enum((shortlist_item or {}).get("language_check"), LANGUAGE_CHECKS, "unknown")
+    if llm_check != "unknown":
+        return llm_check
+    existing = _enum(job.get("language_check"), LANGUAGE_CHECKS, "unknown")
+    if existing != "unknown":
+        return existing
+    return infer_language_check(job)
+
+
+def infer_remote_location_validity(job: dict[str, Any], profile: dict[str, Any] | None = None) -> str:
+    blob = _strip_accents(_job_text(job)).lower()
+    if _REMOTE_INCOMPATIBLE_RE.search(blob):
+        return "incompatible"
+    if _REMOTE_COMPATIBLE_RE.search(blob):
+        return "compatible"
+    market = normalize_space(str(job.get("market") or "")).lower()
+    target_markets = set((profile or {}).get("search", {}).get("target_markets", []))
+    if market and market in target_markets:
+        return "compatible"
+    country_blob = normalize_space(text_blob(job.get("country"), job.get("location"))).lower()
+    target_location_tokens = _target_location_tokens(profile)
+    if any(token and token in country_blob for token in target_location_tokens):
+        return "compatible"
+    if _REMOTE_RESTRICTED_RE.search(blob):
+        return "restricted"
+    if bool(job.get("remote")):
+        return "unknown"
+    return "unknown"
+
+
+def effective_remote_location_validity(
+    job: dict[str, Any],
+    shortlist_item: dict[str, Any] | None = None,
+    profile: dict[str, Any] | None = None,
+) -> str:
+    llm_check = _enum((shortlist_item or {}).get("remote_location_validity"), REMOTE_LOCATION_VALIDITY_CHECKS, "unknown")
+    if llm_check != "unknown":
+        return llm_check
+    existing = _enum(job.get("remote_location_validity"), REMOTE_LOCATION_VALIDITY_CHECKS, "unknown")
+    if existing != "unknown":
+        return existing
+    return infer_remote_location_validity(job, profile)
+
+
 def build_recruiter_message(item: dict[str, Any]) -> str:
     title = normalize_space(str(item.get("title") or "votre offre"))
     company = normalize_space(str(item.get("company") or "votre equipe"))
@@ -158,6 +289,10 @@ def build_recruiter_message(item: dict[str, Any]) -> str:
     start_check = normalize_space(str(item.get("last_start_date_check") or "unknown"))
     salary_check = normalize_space(str(item.get("last_salary_check") or "unknown"))
     remote_check = normalize_space(str(item.get("last_remote_check") or "unknown"))
+    language_check = normalize_space(str(item.get("last_language_check") or item.get("language_check") or "unknown"))
+    remote_location_validity = normalize_space(
+        str(item.get("last_remote_location_validity") or item.get("remote_location_validity") or "unknown")
+    )
 
     lines = [
         "Bonjour,",
@@ -183,6 +318,14 @@ def build_recruiter_message(item: dict[str, Any]) -> str:
         confirmations.append("le rythme hybride/remote permet au moins deux jours de teletravail")
     elif remote_check == "weak":
         confirmations.append("un rythme hybride est envisageable malgre l'indication presentielle")
+    if language_check == "local_language_required":
+        confirmations.append("le niveau de langue locale requis et la possibilite de travailler en francais/anglais")
+    elif language_check == "unknown":
+        confirmations.append("la langue de travail principale est compatible francais/anglais")
+    if remote_location_validity in {"unknown", "restricted"}:
+        confirmations.append("la contrainte de localisation/remote est compatible avec une base en France ou Europe")
+    elif remote_location_validity == "incompatible":
+        confirmations.append("une exception de localisation ou un contrat Europe est envisageable")
 
     if confirmations:
         lines.append("Pouvez-vous me confirmer ces points: " + " ; ".join(confirmations) + " ?")
@@ -196,6 +339,67 @@ def availability_note(profile: dict[str, Any] | None = None) -> str:
     constraints = (profile or {}).get("constraints", {})
     note = normalize_space(str(constraints.get("availability_note") or ""))
     return note or DEFAULT_AVAILABILITY_NOTE
+
+
+def _target_location_tokens(profile: dict[str, Any] | None = None) -> set[str]:
+    defaults = {
+        "france",
+        "paris",
+        "belgium",
+        "brussels",
+        "ireland",
+        "dublin",
+        "switzerland",
+        "zurich",
+        "geneva",
+        "lausanne",
+        "basel",
+        "germany",
+        "berlin",
+        "austria",
+        "vienna",
+        "sweden",
+        "stockholm",
+        "denmark",
+        "copenhagen",
+        "norway",
+        "oslo",
+        "finland",
+        "helsinki",
+        "spain",
+        "barcelona",
+        "madrid",
+        "portugal",
+        "lisbon",
+        "netherlands",
+        "amsterdam",
+        "luxembourg",
+        "united kingdom",
+        "london",
+        "singapore",
+        "estonia",
+        "tallinn",
+        "tartu",
+        "poland",
+        "warsaw",
+        "krakow",
+        "wroclaw",
+        "gdansk",
+        "czechia",
+        "czech republic",
+        "prague",
+        "brno",
+        "remote europe",
+        "emea",
+    }
+    profile = profile or {}
+    configured = [
+        *profile.get("search", {}).get("primary_locations", []),
+        *profile.get("personal", {}).get("major_cities", []),
+    ]
+    tokens = {_strip_accents(token).lower() for token in defaults}
+    tokens.update(_strip_accents(normalize_space(str(token))).lower() for token in configured if token)
+    return {token for token in tokens if len(token) >= 3}
 
 
 def _find_contextual_start_date(normalized: str) -> date | None:
@@ -260,6 +464,7 @@ def _job_text(job: dict[str, Any]) -> str:
         str(job.get("location") or ""),
         str(job.get("salary") or ""),
         str(job.get("employment_type") or ""),
+        str(job.get("deadline") or ""),
         " ".join(str(item) for item in job.get("tags", []) if item) if isinstance(job.get("tags"), list) else "",
         clean_html(str(job.get("description") or ""))[:8000],
     )

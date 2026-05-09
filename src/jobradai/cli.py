@@ -68,7 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     history.add_argument("--timeout", type=int, default=10)
     history.add_argument("--workers", type=int, default=8)
 
-    graduate = sub.add_parser("graduate-digest", help="Genere le digest graduate/early-career depuis jobs.json.")
+    graduate = sub.add_parser("graduate-digest", help="Genere le digest graduate/early-career/doctoral depuis jobs.json.")
     graduate.add_argument("--root", type=Path, default=PROJECT_ROOT)
     graduate.add_argument("--input", type=Path, default=None)
     graduate.add_argument("--output", type=Path, default=None)

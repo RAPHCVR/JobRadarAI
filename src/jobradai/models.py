@@ -18,11 +18,22 @@ class Job:
     remote: bool = False
     description: str = ""
     posted_at: str = ""
+    deadline: str = ""
     salary: str = ""
+    salary_currency: str = ""
+    salary_period: str = ""
+    salary_min_annual_eur: float | None = None
+    salary_max_annual_eur: float | None = None
+    salary_normalized_annual_eur: float | None = None
     employment_type: str = ""
     ats: str = ""
     apply_url: str = ""
     tags: list[str] = field(default_factory=list)
+    language_check: str = "unknown"
+    remote_location_validity: str = "unknown"
+    required_years: float | None = None
+    experience_check: str = "unknown"
+    experience_evidence: str = ""
     raw_id: str = ""
     market: str = "unknown"
     score: float = 0.0

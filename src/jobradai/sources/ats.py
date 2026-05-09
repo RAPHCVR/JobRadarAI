@@ -3,7 +3,7 @@ from __future__ import annotations
 import xml.etree.ElementTree as ET
 from typing import Any
 
-from jobradai.http import HttpClient
+from jobradai.http import HttpClient, HttpError
 from jobradai.models import Job
 from jobradai.text import clean_html, normalize_space, text_blob
 
@@ -115,18 +115,141 @@ def _ashby(feed: dict[str, Any], http: HttpClient) -> list[Job]:
 
 
 def _smartrecruiters(feed: dict[str, Any], http: HttpClient) -> list[Job]:
-    data = http.fetch_json(feed["url"])
-    rows = data.get("content") or data.get("postings") or []
     jobs: list[Job] = []
-    for item in rows:
-        url = item.get("ref") or item.get("applyUrl") or item.get("url") or ""
-        job = _base_job(feed, item.get("name") or item.get("title", ""), url)
-        job.raw_id = str(item.get("id", ""))
-        job.location = _extract_location(item.get("location"))
-        job.posted_at = item.get("releasedDate") or item.get("createdOn") or ""
-        job.description = clean_html(item.get("jobAd", {}).get("sections", {}).get("jobDescription", {}).get("text", ""))
-        jobs.append(job)
+    seen: set[str] = set()
+    for params in _smartrecruiters_page_params(feed):
+        data = http.fetch_json(feed["url"], params=params)
+        rows = data.get("content") or data.get("postings") or []
+        for item in rows:
+            if not isinstance(item, dict):
+                continue
+            raw_id = str(item.get("id") or item.get("uuid") or "").strip()
+            if raw_id and raw_id in seen:
+                continue
+            detail = _smartrecruiters_detail(item, http, enabled=bool(feed.get("fetch_details", True)))
+            if _smartrecruiters_inactive(detail):
+                continue
+            if not _smartrecruiters_title_allowed(feed, item, detail):
+                continue
+            detail_id = str(detail.get("id") or detail.get("uuid") or "").strip()
+            dedupe_id = detail_id or raw_id
+            if dedupe_id and dedupe_id in seen:
+                continue
+            for candidate_id in (raw_id, detail_id):
+                if candidate_id:
+                    seen.add(candidate_id)
+            jobs.append(_smartrecruiters_job(feed, item, detail))
     return jobs
+
+
+def _smartrecruiters_page_params(feed: dict[str, Any]) -> list[dict[str, Any]]:
+    page_size = _bounded_int(feed.get("page_size") or feed.get("limit"), default=100, minimum=1, maximum=100)
+    max_pages = _bounded_int(feed.get("max_pages"), default=1, minimum=1, maximum=8)
+    queries = [str(query).strip() for query in feed.get("queries", []) if str(query).strip()]
+    if not queries:
+        queries = [""]
+    params: list[dict[str, Any]] = []
+    for query in queries:
+        for page in range(max_pages):
+            item: dict[str, Any] = {"limit": page_size, "offset": page * page_size}
+            if query:
+                item["q"] = query
+            params.append(item)
+    return params
+
+
+def _bounded_int(value: Any, *, default: int, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return default
+    return max(minimum, min(parsed, maximum))
+
+
+def _smartrecruiters_detail(item: dict[str, Any], http: HttpClient, *, enabled: bool) -> dict[str, Any]:
+    if not enabled:
+        return item
+    ref = str(item.get("ref") or "").strip()
+    if not ref:
+        return item
+    try:
+        data = http.fetch_json(ref)
+    except HttpError:
+        return item
+    return data if isinstance(data, dict) else item
+
+
+def _smartrecruiters_inactive(item: dict[str, Any]) -> bool:
+    visibility = str(item.get("visibility") or "").upper()
+    return item.get("active") is False or visibility == "INTERNAL"
+
+
+def _smartrecruiters_title_allowed(feed: dict[str, Any], item: dict[str, Any], detail: dict[str, Any]) -> bool:
+    title = _smartrecruiters_title(item, detail).lower()
+    include = [str(term).strip().lower() for term in feed.get("include_title_keywords", []) if str(term).strip()]
+    exclude = [str(term).strip().lower() for term in feed.get("exclude_title_keywords", []) if str(term).strip()]
+    if include and not any(term in title for term in include):
+        return False
+    return not any(term in title for term in exclude)
+
+
+def _smartrecruiters_title(item: dict[str, Any], detail: dict[str, Any]) -> str:
+    return normalize_space(detail.get("name") or detail.get("title") or item.get("name") or item.get("title"))
+
+
+def _smartrecruiters_job(feed: dict[str, Any], item: dict[str, Any], detail: dict[str, Any]) -> Job:
+    url = detail.get("postingUrl") or detail.get("applyUrl") or item.get("url") or item.get("ref") or ""
+    apply_url = detail.get("applyUrl") or url
+    job = _base_job(feed, _smartrecruiters_title(item, detail), url)
+    job.apply_url = apply_url
+    job.raw_id = str(detail.get("id") or item.get("id") or item.get("uuid") or "")
+    job.location = _extract_location(detail.get("location") or item.get("location"))
+    location = detail.get("location") or item.get("location") or {}
+    if isinstance(location, dict):
+        job.remote = bool(location.get("remote") or location.get("hybrid"))
+    job.posted_at = detail.get("releasedDate") or item.get("releasedDate") or item.get("createdOn") or ""
+    job.description = _smartrecruiters_description(detail)
+    job.employment_type = normalize_space(
+        text_blob(
+            _label(detail.get("typeOfEmployment") or item.get("typeOfEmployment")),
+            _label(detail.get("experienceLevel") or item.get("experienceLevel")),
+            _label(detail.get("function") or item.get("function")),
+            _label(detail.get("department") or item.get("department")),
+        )
+    )
+    job.tags = _smartrecruiters_tags(detail or item)
+    return job
+
+
+def _smartrecruiters_description(item: dict[str, Any]) -> str:
+    sections = item.get("jobAd", {}).get("sections", {}) if isinstance(item.get("jobAd"), dict) else {}
+    parts: list[str] = []
+    if isinstance(sections, dict):
+        for key in ("companyDescription", "jobDescription", "qualifications", "additionalInformation"):
+            section = sections.get(key)
+            if isinstance(section, dict):
+                parts.append(str(section.get("text") or ""))
+    parts.extend(_smartrecruiters_tags(item))
+    return clean_html(text_blob(*parts))
+
+
+def _smartrecruiters_tags(item: dict[str, Any]) -> list[str]:
+    tags = [
+        _label(item.get("function")),
+        _label(item.get("department")),
+        _label(item.get("typeOfEmployment")),
+        _label(item.get("experienceLevel")),
+    ]
+    for field in item.get("customField") or []:
+        if isinstance(field, dict):
+            tags.append(normalize_space(field.get("valueLabel")))
+    return [tag for tag in tags if tag]
+
+
+def _label(value: Any) -> str:
+    if isinstance(value, dict):
+        return normalize_space(value.get("label") or value.get("name") or value.get("id"))
+    return normalize_space(str(value or ""))
 
 
 def _workable(feed: dict[str, Any], http: HttpClient) -> list[Job]:

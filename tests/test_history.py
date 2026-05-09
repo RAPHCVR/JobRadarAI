@@ -155,6 +155,36 @@ class HistoryTests(unittest.TestCase):
             self.assertEqual(item["last_remote_check"], "meets")
             self.assertIn("aout/septembre 2026", item["last_recruiter_message"])
 
+    def test_sync_history_excludes_too_senior_items_from_queue(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "latest"
+            output.mkdir()
+            history_db = root / "history" / "job_history.sqlite"
+            job = Job(
+                source="ATS",
+                source_type="ats",
+                title="Senior AI Engineer",
+                company="Acme",
+                url="https://jobs.example.com/senior-ai",
+                market="france",
+                score=82,
+            ).as_dict()
+            self._write_run(
+                output,
+                [job],
+                shortlist_items=[
+                    {
+                        "stable_id": job["stable_id"],
+                        "priority": "shortlist",
+                        "level_fit": "too_senior",
+                        "combined_score": 85,
+                    }
+                ],
+            )
+            result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
+            self.assertFalse(any(item["stable_id"] == job["stable_id"] for item in result["items"]))
+
     def _write_run(self, output: Path, jobs: list[dict], shortlist_items: list[dict]) -> None:
         (output / "jobs.json").write_text(json.dumps(jobs, ensure_ascii=False), encoding="utf-8")
         (output / "llm_shortlist.json").write_text(

@@ -63,6 +63,14 @@ def _write_csv(path: Path, jobs: list[Job]) -> None:
         "source",
         "source_type",
         "salary",
+        "salary_normalized_annual_eur",
+        "salary_currency",
+        "deadline",
+        "language_check",
+        "remote_location_validity",
+        "required_years",
+        "experience_check",
+        "experience_evidence",
         "posted_at",
         "url",
         "reasons",
@@ -81,6 +89,14 @@ def _write_csv(path: Path, jobs: list[Job]) -> None:
                     "source": _csv_cell(job.source),
                     "source_type": _csv_cell(job.source_type),
                     "salary": _csv_cell(job.salary),
+                    "salary_normalized_annual_eur": job.salary_normalized_annual_eur or "",
+                    "salary_currency": _csv_cell(job.salary_currency),
+                    "deadline": _csv_cell(job.deadline),
+                    "language_check": _csv_cell(job.language_check),
+                    "remote_location_validity": _csv_cell(job.remote_location_validity),
+                    "required_years": job.required_years if job.required_years is not None else "",
+                    "experience_check": _csv_cell(job.experience_check),
+                    "experience_evidence": _csv_cell(job.experience_evidence),
                     "posted_at": _csv_cell(job.posted_at),
                     "url": _csv_cell(_safe_url(job.url)),
                     "reasons": _csv_cell(" | ".join(job.reasons)),
@@ -124,6 +140,8 @@ def _write_markdown(path: Path, jobs: list[Job], runs: list[SourceRun]) -> None:
             [
                 f"### {idx}. {job.title} - {job.company} ({job.score:.1f})",
                 f"- Marche: `{job.market}` | Source: `{job.source}` | Lieu: {job.location or 'n/a'}",
+                f"- Deadline: {job.deadline or 'n/a'} | Langue: `{job.language_check}` | Remote/location: `{job.remote_location_validity}`",
+                f"- Experience: `{job.experience_check}` | annees requises: `{job.required_years if job.required_years is not None else 'n/a'}`",
                 f"- URL: {job.url}",
                 f"- Sous-scores: {parts}",
                 f"- Raisons: {'; '.join(job.reasons[:8])}",
@@ -164,6 +182,8 @@ def _write_html(path: Path, jobs: list[Job], runs: list[SourceRun]) -> None:
                   <div class="body">
                     <h3>{title_html}</h3>
                     <p class="meta">{html.escape(job.company)} · {html.escape(job.location or 'n/a')} · {html.escape(job.source)} · {html.escape(job.salary or 'salary n/a')}</p>
+                    <p class="meta">deadline {html.escape(job.deadline or 'n/a')} · langue {html.escape(job.language_check)} · remote/location {html.escape(job.remote_location_validity)}</p>
+                    <p class="meta">experience {html.escape(job.experience_check)} · required years {html.escape(str(job.required_years if job.required_years is not None else 'n/a'))}</p>
                     <div class="parts">{parts}</div>
                     <ul>{reasons}</ul>
                   </div>

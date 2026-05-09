@@ -10,6 +10,10 @@ _EARLY_QUERY_RE = re.compile(
     r"\b(graduate|new grad|early careers?|campus|trainee|entry[- ]level|junior)\b",
     re.IGNORECASE,
 )
+_DOCTORAL_QUERY_RE = re.compile(
+    r"\b(cifre|industrial ph\.?d|doctorant|doctoral|ph\.?d|phd|thesis|thèse)\b",
+    re.IGNORECASE,
+)
 
 
 def select_query_items(
@@ -67,11 +71,17 @@ def _query_items(config: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _infer_category(term: str) -> str:
+    if _DOCTORAL_QUERY_RE.search(term):
+        return "research_doctoral"
     return "early_career" if _EARLY_QUERY_RE.search(term) else "core"
 
 
 def _is_early_item(item: dict[str, Any]) -> bool:
-    return str(item.get("category") or "") in {"early_career", "graduate"} or _EARLY_QUERY_RE.search(str(item.get("term") or "")) is not None
+    return (
+        str(item.get("category") or "") in {"early_career", "graduate", "research_doctoral"}
+        or _EARLY_QUERY_RE.search(str(item.get("term") or "")) is not None
+        or _DOCTORAL_QUERY_RE.search(str(item.get("term") or "")) is not None
+    )
 
 
 def _count_early(items: list[dict[str, Any]]) -> int:

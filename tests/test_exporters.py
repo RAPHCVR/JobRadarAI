@@ -38,6 +38,23 @@ class ExporterSecurityTests(unittest.TestCase):
             self.assertEqual(payload["target_count"], 1)
             self.assertTrue((Path(tmp) / "graduate_programs.md").exists())
 
+    def test_graduate_digest_counts_industrial_doctorates(self) -> None:
+        job = Job(
+            source="test",
+            source_type="official_api",
+            title="Doctorant CIFRE IA - Machine Learning",
+            company="Example AI",
+            url="https://example.com/cifre",
+            location="Paris, France",
+            description="CIFRE industrial PhD in applied AI research, Python, LLM evaluation and explainability.",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            export_all(Path(tmp), [job], [], profile={"constraints": {"target_start_after": "2026-08"}})
+            payload = json.loads((Path(tmp) / "graduate_programs.json").read_text(encoding="utf-8"))
+            self.assertEqual(payload["target_count"], 1)
+            self.assertEqual(payload["doctoral_count"], 1)
+            self.assertEqual(payload["industrial_doctoral_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

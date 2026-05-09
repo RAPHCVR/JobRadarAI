@@ -8,6 +8,15 @@ output_dir = "runs/latest"
 business_france_vie = true
 forem = true
 actiris = true
+bundesagentur = true
+jobtechdev_sweden = true
+nav_norway = true
+euraxess = true
+doctorat_gouv = true
+academictransfer = true
+weworkremotely = true
+swissdevjobs = true
+germantechjobs = true
 remotive = true
 arbeitnow = true
 remoteok = true
@@ -47,11 +56,117 @@ page_size = 20
 max_pages = 2
 
 [france_travail]
-max_queries = 22
+max_queries = 30
+
+[bundesagentur]
+endpoint = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/jobs"
+api_key = "jobboerse-jobsuche"
+max_queries = 8
+page_size = 20
+max_pages = 1
+countries = ["Deutschland", "Österreich"]
+queries = [
+  "Data Engineer",
+  "AI Engineer",
+  "LLM Engineer",
+  "Machine Learning Engineer",
+  "MLOps Engineer",
+  "Junior Data Engineer",
+  "KI Data Engineer",
+  "Data Scientist"
+]
+
+[jobtechdev_sweden]
+endpoint = "https://jobsearch.api.jobtechdev.se/search"
+max_queries = 8
+page_size = 20
+max_pages = 1
+queries = [
+  "Data Engineer",
+  "AI Engineer",
+  "LLM Engineer",
+  "Machine Learning Engineer",
+  "MLOps Engineer",
+  "Junior Data Engineer",
+  "Data Scientist"
+]
+
+[nav_norway]
+endpoint = "https://arbeidsplassen.nav.no/stillinger/api/search"
+max_queries = 8
+page_size = 25
+max_pages = 1
+queries = [
+  "Data Engineer",
+  "AI Engineer",
+  "LLM Engineer",
+  "Machine Learning Engineer",
+  "MLOps Engineer",
+  "Junior Data Engineer",
+  "Data Scientist"
+]
+
+[euraxess]
+endpoint = "https://euraxess.ec.europa.eu/jobs/search"
+max_pages = 10
+max_results = 120
+
+[doctorat_gouv]
+endpoint = "https://app.doctorat.gouv.fr/api/propositions-these"
+max_queries = 8
+page_size = 20
+max_pages = 2
+max_results = 160
+include_assigned = false
+queries = [
+  "CIFRE",
+  "LLM",
+  "machine learning",
+  "data science",
+  "NLP",
+  "intelligence artificielle",
+  "jumeau numérique",
+  "optimisation"
+]
+
+[academictransfer]
+token_page = "https://www.academictransfer.com/en/jobs/?q=phd"
+endpoint = "https://api.academictransfer.com/vacancies/"
+max_queries = 5
+page_size = 10
+max_pages = 2
+max_results = 80
+queries = [
+  "phd machine learning",
+  "phd data science",
+  "phd artificial intelligence",
+  "phd software",
+  "phd computer science"
+]
+
+[weworkremotely]
+max_items = 120
+feeds = [
+  "https://weworkremotely.com/categories/remote-programming-jobs.rss",
+  "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss"
+]
+
+[swissdevjobs]
+feed = "https://swissdevjobs.ch/rss"
+max_items = 260
+
+[germantechjobs]
+feed = "https://germantechjobs.de/rss"
+max_items = 400
 
 [jooble]
 max_queries = 8
-locations = ["Ireland", "Switzerland", "Belgium", "Singapore", "France", "Netherlands", "Luxembourg", "United Kingdom", "Germany"]
+locations = ["Ireland", "Switzerland", "Belgium", "Singapore", "France", "Netherlands", "Luxembourg", "United Kingdom", "Germany", "Austria", "Sweden", "Denmark", "Norway", "Finland", "Spain", "Portugal", "Estonia", "Poland", "Czechia"]
+
+[adzuna]
+countries = ["fr", "gb", "de", "at", "pl", "nl", "be", "ch"]
+max_queries = 16
+results_per_page = 30
 
 [optional_sources]
 adzuna = true
@@ -66,6 +181,7 @@ vdab_generic = false
 max_queries = 18
 results_wanted = 12
 hours_old = 336
+timeout_seconds = 240
 sites = ["indeed"]
 include_linkedin = false
 locations = [
@@ -78,7 +194,18 @@ locations = [
   { label = "Amsterdam, Netherlands", country_indeed = "Netherlands" },
   { label = "Luxembourg", country_indeed = "Luxembourg" },
   { label = "London, United Kingdom", country_indeed = "UK" },
-  { label = "Berlin, Germany", country_indeed = "Germany" }
+  { label = "Berlin, Germany", country_indeed = "Germany" },
+  { label = "Vienna, Austria", country_indeed = "Austria" },
+  { label = "Stockholm, Sweden", country_indeed = "Sweden" },
+  { label = "Copenhagen, Denmark", country_indeed = "Denmark" },
+  { label = "Oslo, Norway", country_indeed = "Norway" },
+  { label = "Helsinki, Finland", country_indeed = "Finland" },
+  { label = "Barcelona, Spain", country_indeed = "Spain" },
+  { label = "Madrid, Spain", country_indeed = "Spain" },
+  { label = "Lisbon, Portugal", country_indeed = "Portugal" },
+  { label = "Tallinn, Estonia", country_indeed = "Estonia" },
+  { label = "Warsaw, Poland", country_indeed = "Poland" },
+  { label = "Prague, Czechia", country_indeed = "Czech Republic" }
 ]
 
 [[queries]]
@@ -128,6 +255,41 @@ priority = 9
 [[queries]]
 term = "Research Engineer"
 priority = 8
+
+[[queries]]
+term = "CIFRE IA"
+priority = 9
+category = "research_doctoral"
+
+[[queries]]
+term = "CIFRE Data Science"
+priority = 8
+category = "research_doctoral"
+
+[[queries]]
+term = "Doctorant IA"
+priority = 8
+category = "research_doctoral"
+
+[[queries]]
+term = "Industrial PhD AI"
+priority = 8
+category = "research_doctoral"
+
+[[queries]]
+term = "Doctorant Machine Learning"
+priority = 7
+category = "research_doctoral"
+
+[[queries]]
+term = "PhD Candidate Machine Learning"
+priority = 7
+category = "research_doctoral"
+
+[[queries]]
+term = "Doctoral Researcher AI"
+priority = 7
+category = "research_doctoral"
 
 [[queries]]
 term = "NLP Engineer"
@@ -449,3 +611,42 @@ name = "Doctolib"
 type = "greenhouse"
 url = "https://boards-api.greenhouse.io/v1/boards/doctolib/jobs?content=true"
 markets = ["france", "germany", "remote_europe"]
+
+[[ats_feeds]]
+name = "Delivery Hero"
+type = "smartrecruiters"
+url = "https://api.smartrecruiters.com/v1/companies/DeliveryHero/postings"
+markets = ["germany", "singapore", "uk", "remote_europe"]
+page_size = 20
+max_pages = 1
+fetch_details = true
+include_title_keywords = [
+  "data engineer",
+  "machine learning engineer",
+  "ml engineer",
+  "ai engineer",
+  "applied ai engineer",
+  "backend software engineer",
+  "data scientist",
+  "tech grad",
+  "graduate"
+]
+exclude_title_keywords = [
+  "senior",
+  "staff",
+  "principal",
+  "lead",
+  "manager",
+  "head of",
+  "director",
+  "intern",
+  "labeler",
+  "ios",
+  "android"
+]
+queries = [
+  "machine learning",
+  "AI Engineer",
+  "data engineer",
+  "software engineer"
+]

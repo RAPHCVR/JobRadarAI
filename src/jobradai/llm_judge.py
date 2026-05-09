@@ -27,6 +27,8 @@ VALID_LEVEL_FITS = {"junior_ok", "stretch", "too_senior", "too_junior", "unknown
 VALID_SALARY_CHECKS = {"meets_or_likely", "unknown", "below_min"}
 VALID_REMOTE_CHECKS = {"meets", "unknown", "weak"}
 VALID_START_DATE_CHECKS = {"compatible", "too_soon", "unknown"}
+VALID_LANGUAGE_CHECKS = {"english_ok", "french_ok", "local_language_required", "unknown"}
+VALID_REMOTE_LOCATION_VALIDITY = {"compatible", "restricted", "incompatible", "unknown"}
 
 
 class LLMJudgeError(RuntimeError):
@@ -469,6 +471,14 @@ def _compact_job(job: dict[str, Any]) -> dict[str, Any]:
         "location": job.get("location", ""),
         "remote": bool(job.get("remote", False)),
         "salary": job.get("salary", ""),
+        "salary_normalized_annual_eur": job.get("salary_normalized_annual_eur"),
+        "salary_currency": job.get("salary_currency", ""),
+        "deadline": job.get("deadline", ""),
+        "language_check": job.get("language_check", "unknown"),
+        "remote_location_validity": job.get("remote_location_validity", "unknown"),
+        "required_years": job.get("required_years"),
+        "experience_check": job.get("experience_check", "unknown"),
+        "experience_evidence": job.get("experience_evidence", ""),
         "posted_at": job.get("posted_at", ""),
         "source": job.get("source", ""),
         "source_type": job.get("source_type", ""),
@@ -511,7 +521,16 @@ def _judge_request_payload(profile_summary: dict[str, Any], jobs: list[dict[str,
             "parce que le remote, le salaire CDI ou le niveau exact sont a verifier. Pour les graduate "
             "programmes, new grad, early careers, campus et trainee programmes, ne penalise pas le label "
             "graduate/junior seul si le role est data/AI/software/research; evalue surtout le contenu "
-            "technique, l'intake/cohorte, la date de demarrage et le risque de programme business generaliste.\n\n"
+            "technique, l'intake/cohorte, la date de demarrage et le risque de programme business generaliste. "
+            "Pour les doctorats en entreprise, CIFRE, industrial PhD ou doctoral researcher, garde l'offre "
+            "si elle est appliquee data/AI/LLM/research et si le statut/salaire semble compatible; sois plus "
+            "prudent avec les PhD purement academiques sans entreprise, salaire ou sujet technique clair.\n\n"
+            "Utilise aussi les signaux structures deadline, language_check, remote_location_validity, "
+            "required_years et experience_check quand ils sont "
+            "renseignes. Un besoin explicite de langue locale non maitrisee ou une restriction remote hors Europe "
+            "doit etre un risque fort, mais pas un skip automatique si le role est excellent et que l'information "
+            "reste negociable/verifiable. En revanche, si experience_check vaut too_senior ou required_years >= 5 "
+            "sans signal explicite junior/new-grad/all-levels, le poste doit normalement etre skip.\n\n"
             "Retour attendu, strictement en JSON:\n"
             f"{json.dumps(_expected_schema(), ensure_ascii=False)}\n\n"
             "Regles:\n"
@@ -522,12 +541,17 @@ def _judge_request_payload(profile_summary: dict[str, Any], jobs: list[dict[str,
             "- maybe: fit partiel, pivot possible, ou info trop incomplete.\n"
             "- skip: uniquement role clairement hors cible, trop senior, trop business/non-tech, ou incompatibilite forte.\n"
             "- Un graduate programme data/AI/software coherent doit rester apply_now/shortlist/maybe selon le fit, pas skip par defaut.\n"
+            "- Un CIFRE/industrial PhD data/AI/research coherent est un angle opportuniste valable; verifie salaire/statut/entreprise et ne le classe pas comme stage.\n"
+            "- Pour ce profil junior/new-grad, une exigence 2+ ans est un stretch a verifier, 3-4+ ans requis doit rarement etre apply_now, "
+            "et 5+ ans ou titre senior/staff/lead/principal doit normalement etre too_senior/skip sauf signal explicite new-grad/all-levels.\n"
             "- level_fit: junior_ok, stretch, too_senior, too_junior ou unknown.\n"
             "- salary_check: meets_or_likely, unknown ou below_min.\n"
             "- remote_check: meets, unknown ou weak.\n"
             "- start_date_check: compatible si l'offre indique un demarrage apres juillet 2026 ou negociable; "
             "too_soon si ASAP/immediat/avant aout 2026; unknown si absent. C'est un signal soft, pas un motif de skip seul.\n"
             "- start_date_evidence: extrait ou date courte, vide si unknown.\n"
+            "- language_check: english_ok, french_ok, local_language_required ou unknown.\n"
+            "- remote_location_validity: compatible, restricted, incompatible ou unknown.\n"
             "- why et risks: 1 a 4 phrases courtes chacune, en francais.\n"
             "- application_angle: une phrase concrete pour adapter CV/message.\n"
             "- N'invente pas une information absente de l'offre.\n\n"
@@ -550,6 +574,8 @@ def _expected_schema() -> dict[str, Any]:
                 "remote_check": "meets|unknown|weak",
                 "start_date_check": "compatible|too_soon|unknown",
                 "start_date_evidence": "date ou extrait justifiant le check",
+                "language_check": "english_ok|french_ok|local_language_required|unknown",
+                "remote_location_validity": "compatible|restricted|incompatible|unknown",
                 "why": ["raison courte"],
                 "risks": ["risque court"],
                 "application_angle": "angle CV/message",
@@ -645,15 +671,21 @@ def _normalise_judgements(raw: dict[str, Any] | list[Any], jobs: list[dict[str, 
         stable_id = str(row.get("stable_id", ""))
         if stable_id not in allowed_ids:
             continue
+        priority = _enum(row.get("priority"), VALID_PRIORITIES, "maybe")
+        level_fit = _enum(row.get("level_fit"), VALID_LEVEL_FITS, "unknown")
+        if level_fit in {"too_senior", "too_junior"} and priority in {"apply_now", "shortlist"}:
+            priority = "skip"
         result[stable_id] = {
             "stable_id": stable_id,
             "fit_score": _clamp_score(row.get("fit_score", 50)),
-            "priority": _enum(row.get("priority"), VALID_PRIORITIES, "maybe"),
-            "level_fit": _enum(row.get("level_fit"), VALID_LEVEL_FITS, "unknown"),
+            "priority": priority,
+            "level_fit": level_fit,
             "salary_check": _enum(row.get("salary_check"), VALID_SALARY_CHECKS, "unknown"),
             "remote_check": _enum(row.get("remote_check"), VALID_REMOTE_CHECKS, "unknown"),
             "start_date_check": _enum(row.get("start_date_check"), VALID_START_DATE_CHECKS, "unknown"),
             "start_date_evidence": normalize_space(str(row.get("start_date_evidence", "")))[:500],
+            "language_check": _enum(row.get("language_check"), VALID_LANGUAGE_CHECKS, "unknown"),
+            "remote_location_validity": _enum(row.get("remote_location_validity"), VALID_REMOTE_LOCATION_VALIDITY, "unknown"),
             "why": _string_list(row.get("why"))[:4],
             "risks": _string_list(row.get("risks"))[:4],
             "application_angle": normalize_space(str(row.get("application_angle", "")))[:500],
@@ -680,6 +712,8 @@ def _merge_judgements(jobs: list[dict[str, Any]], judgements: dict[str, dict[str
                 "remote_check": judgement["remote_check"],
                 "start_date_check": judgement["start_date_check"],
                 "start_date_evidence": judgement["start_date_evidence"],
+                "language_check": judgement.get("language_check", "unknown"),
+                "remote_location_validity": judgement.get("remote_location_validity", "unknown"),
                 "why": judgement["why"],
                 "risks": judgement["risks"],
                 "application_angle": judgement["application_angle"],
@@ -688,6 +722,11 @@ def _merge_judgements(jobs: list[dict[str, Any]], judgements: dict[str, dict[str
                 "market": job.get("market", ""),
                 "location": job.get("location", ""),
                 "salary": job.get("salary", ""),
+                "salary_normalized_annual_eur": job.get("salary_normalized_annual_eur"),
+                "deadline": job.get("deadline", ""),
+                "required_years": job.get("required_years"),
+                "experience_check": job.get("experience_check", "unknown"),
+                "experience_evidence": job.get("experience_evidence", ""),
                 "source": job.get("source", ""),
                 "url": job.get("url", ""),
                 "deterministic_reasons": job.get("reasons", [])[:8],
@@ -706,6 +745,8 @@ def _default_judgement(stable_id: str) -> dict[str, Any]:
         "remote_check": "unknown",
         "start_date_check": "unknown",
         "start_date_evidence": "",
+        "language_check": "unknown",
+        "remote_location_validity": "unknown",
         "why": ["Le LLM n'a pas renvoye de jugement exploitable pour cette offre."],
         "risks": ["Verification manuelle requise."],
         "application_angle": "",
@@ -739,10 +780,11 @@ def _write_markdown(path: Path, result: dict[str, Any]) -> None:
             [
                 f"### {index}. {item['title']} - {item['company']} ({item['combined_score']:.1f})",
                 f"- Scores: local `{item['score']:.1f}` | LLM `{item['llm_fit_score']:.1f}` | priorite `{item['priority']}`",
-                f"- Fit: niveau `{item['level_fit']}` | salaire `{item['salary_check']}` | remote `{item['remote_check']}` | start `{item['start_date_check']}`",
+                f"- Fit: niveau `{item['level_fit']}` | salaire `{item['salary_check']}` | remote `{item['remote_check']}` | start `{item['start_date_check']}` | langue `{item.get('language_check', 'unknown')}` | remote/localisation `{item.get('remote_location_validity', 'unknown')}`",
                 f"- Evidence demarrage: {item.get('start_date_evidence') or 'n/a'}",
                 f"- Marche: `{item['market']}` | Lieu: {item['location'] or 'n/a'} | Source: `{item['source']}`",
-                f"- Salaire publie: {item['salary'] or 'n/a'}",
+                f"- Salaire publie: {item['salary'] or 'n/a'} | normalise EUR/an: {item.get('salary_normalized_annual_eur') or 'n/a'} | deadline: {item.get('deadline') or 'n/a'}",
+                f"- Experience extraite: `{item.get('experience_check', 'unknown')}` | annees `{item.get('required_years') or 'n/a'}` | evidence: {item.get('experience_evidence') or 'n/a'}",
                 f"- URL: {item['url']}",
                 f"- Pourquoi: {why}",
                 f"- Risques: {risks}",

@@ -33,6 +33,15 @@
    - UK: excellent AI/data, mais visa hors UE.
    - Allemagne: gros volume, langue variable.
 
+7. **Extensions opportunistes ajoutees**
+   - Suede: bon marche tech anglophone, surtout Stockholm; source officielle JobTechDev active.
+   - Norvege: salaire fort, EEA accessible, source NAV active; norvegien a verifier.
+   - Danemark: Copenhagen pertinent, anglais tech frequent, couverture via Jooble/JobSpy.
+   - Autriche: Vienne/scaleups, proche Allemagne/Suisse, couverture Bundesagentur/AMS + Jooble/JobSpy.
+   - Finlande: Helsinki/Espoo, bon signal tech mais volume plus faible.
+   - Espagne/Portugal: utiles surtout pour roles remote/startup/high-fit; salaire local souvent sous cible, donc scoring volontairement prudent.
+   - Estonie/Pologne/Tchequie: wide opportuniste pour startups/scaleups anglophones et hubs CEE; a garder seulement si fit technique, langue et salaire sont coherents.
+
 ## Titres A Surponderer
 
 - Data Platform Engineer.
@@ -74,6 +83,8 @@
 - Product manager, program manager, account executive, customer success, marketing/recruiting et support/solution engineering non data/IA.
 - Crypto-only si pas d'engineering data/AI serieux.
 - Remote hors Europe sans droit de travail clair.
+- Remote explicitement US/Canada/LATAM only quand aucune exception EMEA/EU n'est publiee.
+- Langue locale obligatoire quand l'offre indique clairement fluent/native German, Dutch, Norwegian, Polish, Czech, etc. et que le contexte ne compense pas.
 - Offres sans entreprise, sans client, sans stack, sans salaire ni details.
 
 ## Contraintes Personnelles Actuelles
@@ -87,6 +98,16 @@
 - Niveau: junior/new-grad coherent, avec stretch possible seulement si le poste est ouvert, le fit technique est fort, et les risques salaire/remote/visa sont acceptables.
 - Stage courant: Aubay AI Researcher, fev. 2026 a juil. 2026.
 - Demarrage cible: aout/septembre 2026; a confirmer avec RH quand l'offre ne publie pas de date ou indique ASAP/immediat.
+
+## Extension Post-Run 2026-05-09
+
+- Marches ajoutes au scoring: Autriche, Suede, Danemark, Norvege, Finlande, Espagne, Portugal, Estonie, Pologne, Tchequie.
+- Sources officielles/verticales ajoutees: JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS.
+- Sources RSS tech ajoutees: WeWorkRemotely, SwissDevJobs, GermanTechJobs.
+- Bundesagentur accepte maintenant `Deutschland` et `Österreich`, en gardant le pays explicite pour ne pas melanger Allemagne et Autriche.
+- Jooble et JobSpy Direct couvrent maintenant Austria, Sweden, Denmark, Norway, Finland, Spain, Portugal, Estonia, Poland et Czechia.
+- Le critere langue reste pragmatique: priorite aux roles anglophones/francophones ou aux offres dont le fit technique/salaire compense la langue locale a confirmer.
+- Le pipeline expose `deadline`, `language_check`, `remote_location_validity` et `salary_normalized_annual_eur` pour que le judge et la queue priorisent mieux sans devenir trop stricts.
 
 ## Audit Dernier Run
 

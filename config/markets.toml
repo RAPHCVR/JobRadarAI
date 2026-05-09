@@ -88,6 +88,106 @@ visa_score = 92
 language_score = 70
 notes = "Gros volume, langue variable selon entreprise/ville."
 
+[markets.austria]
+label = "Austria"
+aliases = ["austria", "österreich", "oesterreich", "vienna", "wien", "graz", "linz"]
+market_score = 74
+practicality_score = 78
+salary_score = 72
+visa_score = 96
+language_score = 66
+notes = "Extension UE proche Allemagne/Suisse; anglais possible a Vienne/scaleups, allemand souvent a verifier."
+
+[markets.sweden]
+label = "Sweden"
+aliases = ["sweden", "sverige", "stockholm", "gothenburg", "göteborg", "goteborg", "malmo", "malmö", "lund"]
+market_score = 80
+practicality_score = 76
+salary_score = 78
+visa_score = 94
+language_score = 86
+notes = "Bon marche tech nordique anglophone, surtout Stockholm; langue locale a verifier offre par offre."
+
+[markets.denmark]
+label = "Denmark"
+aliases = ["denmark", "danmark", "copenhagen", "københavn", "kobenhavn", "aarhus"]
+market_score = 78
+practicality_score = 76
+salary_score = 82
+visa_score = 94
+language_score = 86
+notes = "Petit volume mais bon salaire et anglais tech frequent autour de Copenhagen."
+
+[markets.norway]
+label = "Norway"
+aliases = ["norway", "norge", "oslo", "bergen", "trondheim", "stavanger"]
+market_score = 80
+practicality_score = 74
+salary_score = 88
+visa_score = 88
+language_score = 84
+notes = "Tres bon salaire, EEA accessible, anglais tech frequent mais norvegien parfois requis."
+
+[markets.finland]
+label = "Finland"
+aliases = ["finland", "suomi", "helsinki", "espoo", "tampere"]
+market_score = 76
+practicality_score = 74
+salary_score = 74
+visa_score = 94
+language_score = 82
+notes = "Bon marche tech Helsinki/Espoo, anglais possible mais volume plus limite."
+
+[markets.spain]
+label = "Spain"
+aliases = ["spain", "españa", "espana", "madrid", "barcelona", "valencia", "malaga", "málaga"]
+market_score = 70
+practicality_score = 82
+salary_score = 55
+visa_score = 96
+language_score = 78
+notes = "Extension UE surtout Barcelona/Madrid; garder les roles haut fit/salaire car remuneration souvent sous cible."
+
+[markets.portugal]
+label = "Portugal"
+aliases = ["portugal", "lisbon", "lisboa", "porto", "oporto"]
+market_score = 68
+practicality_score = 82
+salary_score = 50
+visa_score = 96
+language_score = 78
+notes = "Extension UE remote/startups; salaire local souvent sous cible, a garder en opportuniste seulement."
+
+[markets.estonia]
+label = "Estonia"
+aliases = ["estonia", "eesti", "tallinn", "tartu"]
+market_score = 70
+practicality_score = 78
+salary_score = 62
+visa_score = 96
+language_score = 86
+notes = "Petit marche tech anglophone autour de Tallinn; opportuniste, a garder si role AI/data fort."
+
+[markets.poland]
+label = "Poland"
+aliases = ["poland", "polska", "warsaw", "warszawa", "krakow", "kraków", "wroclaw", "wrocław", "gdansk", "gdańsk"]
+market_score = 72
+practicality_score = 76
+salary_score = 60
+visa_score = 96
+language_score = 76
+notes = "Bon volume tech mais salaire/langue variables; garder les roles anglais high-fit ou remote."
+
+[markets.czechia]
+label = "Czechia"
+aliases = ["czechia", "czech republic", "cesko", "česko", "prague", "praha", "brno"]
+market_score = 70
+practicality_score = 76
+salary_score = 60
+visa_score = 96
+language_score = 76
+notes = "Extension opportuniste Prague/Brno; anglais possible en tech, langue locale a verifier."
+
 [markets.remote_europe]
 label = "Remote Europe"
 aliases = ["remote", "europe", "emea", "worldwide", "anywhere"]

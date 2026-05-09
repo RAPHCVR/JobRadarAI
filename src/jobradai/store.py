@@ -18,6 +18,13 @@ CREATE TABLE IF NOT EXISTS jobs (
   location TEXT,
   market TEXT,
   score REAL,
+  deadline TEXT,
+  language_check TEXT,
+  remote_location_validity TEXT,
+  salary_normalized_annual_eur REAL,
+  required_years REAL,
+  experience_check TEXT,
+  experience_evidence TEXT,
   payload_json TEXT NOT NULL,
   captured_at TEXT NOT NULL
 );
@@ -32,13 +39,15 @@ def write_sqlite(path: Path, jobs: list[Job]) -> None:
     conn = sqlite3.connect(path)
     try:
         conn.executescript(SCHEMA)
+        _ensure_columns(conn)
         conn.execute("DELETE FROM jobs")
         conn.executemany(
             """
             INSERT INTO jobs (
               stable_id, source, source_type, title, company, url,
-              location, market, score, payload_json, captured_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              location, market, score, deadline, language_check, remote_location_validity,
+              salary_normalized_annual_eur, required_years, experience_check, experience_evidence, payload_json, captured_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(stable_id) DO UPDATE SET
               source=excluded.source,
               source_type=excluded.source_type,
@@ -48,6 +57,13 @@ def write_sqlite(path: Path, jobs: list[Job]) -> None:
               location=excluded.location,
               market=excluded.market,
               score=excluded.score,
+              deadline=excluded.deadline,
+              language_check=excluded.language_check,
+              remote_location_validity=excluded.remote_location_validity,
+              salary_normalized_annual_eur=excluded.salary_normalized_annual_eur,
+              required_years=excluded.required_years,
+              experience_check=excluded.experience_check,
+              experience_evidence=excluded.experience_evidence,
               payload_json=excluded.payload_json,
               captured_at=excluded.captured_at
             """,
@@ -62,6 +78,13 @@ def write_sqlite(path: Path, jobs: list[Job]) -> None:
                     job.location,
                     job.market,
                     job.score,
+                    job.deadline,
+                    job.language_check,
+                    job.remote_location_validity,
+                    job.salary_normalized_annual_eur,
+                    job.required_years,
+                    job.experience_check,
+                    job.experience_evidence,
                     json.dumps(job.as_dict(), ensure_ascii=False),
                     job.captured_at,
                 )
@@ -71,3 +94,19 @@ def write_sqlite(path: Path, jobs: list[Job]) -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+def _ensure_columns(conn: sqlite3.Connection) -> None:
+    columns = {str(row[1]) for row in conn.execute("PRAGMA table_info(jobs)")}
+    additions = {
+        "deadline": "TEXT",
+        "language_check": "TEXT",
+        "remote_location_validity": "TEXT",
+        "salary_normalized_annual_eur": "REAL",
+        "required_years": "REAL",
+        "experience_check": "TEXT",
+        "experience_evidence": "TEXT",
+    }
+    for name, column_type in additions.items():
+        if name not in columns:
+            conn.execute(f"ALTER TABLE jobs ADD COLUMN {name} {column_type}")

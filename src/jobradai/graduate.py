@@ -22,6 +22,8 @@ def write_graduate_digest(output_dir: Path, jobs: list[dict[str, Any]], profile:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "count": len(rows),
         "target_count": len([row for row in rows if row["early_career_fit"] in {"high", "medium"}]),
+        "doctoral_count": len([row for row in rows if row["doctoral_program"]]),
+        "industrial_doctoral_count": len([row for row in rows if row["industrial_doctoral"]]),
         "fit_counts": dict(Counter(row["early_career_fit"] for row in rows)),
         "start_date_counts": dict(Counter(row["start_date_check"] for row in rows)),
         "items": rows,
@@ -44,6 +46,8 @@ def _graduate_rows(jobs: list[dict[str, Any]], profile: dict[str, Any]) -> list[
                 "score": _float(job.get("score")),
                 "early_career_fit": signal.get("early_career_fit", "none"),
                 "structured_program": bool(signal.get("structured_program")),
+                "doctoral_program": bool(signal.get("doctoral_program")),
+                "industrial_doctoral": bool(signal.get("industrial_doctoral")),
                 "start_date_check": start.get("check", "unknown"),
                 "start_date_evidence": start.get("evidence", ""),
                 "title": normalize_space(str(job.get("title") or "")),
@@ -75,11 +79,12 @@ def _graduate_markdown(payload: dict[str, Any]) -> str:
     target = [row for row in rows if row.get("early_career_fit") in {"high", "medium"}]
     low = [row for row in rows if row.get("early_career_fit") == "low"]
     lines = [
-        "# Graduate / Early Careers",
+        "# Graduate / Early Careers / Doctoral",
         "",
         f"- Genere le: {payload.get('generated_at', '')}",
         f"- Signaux detectes: **{payload.get('count', 0)}**",
         f"- Cibles high/medium: **{payload.get('target_count', 0)}**",
+        f"- Doctorats/CIFRE detectes: **{payload.get('doctoral_count', 0)}** dont industriels/CIFRE: **{payload.get('industrial_doctoral_count', 0)}**",
         f"- Fits: `{payload.get('fit_counts', {})}`",
         f"- Start dates: `{payload.get('start_date_counts', {})}`",
         "",
@@ -87,7 +92,7 @@ def _graduate_markdown(payload: dict[str, Any]) -> str:
         "",
     ]
     if not target:
-        lines.append("- Aucun programme/role early-career data/AI/software prioritaire detecte dans ce corpus.")
+        lines.append("- Aucun programme/role early-career ou doctorat data/AI/software prioritaire detecte dans ce corpus.")
     for item in target[:120]:
         lines.extend(_row_lines(item))
     lines.extend(["", "## A Verifier / Low Fit", ""])
@@ -101,7 +106,12 @@ def _graduate_markdown(payload: dict[str, Any]) -> str:
 def _row_lines(item: dict[str, Any]) -> list[str]:
     signals = "; ".join(str(value) for value in item.get("signals", []) if value) or "n/a"
     risks = "; ".join(str(value) for value in item.get("risks", []) if value) or "n/a"
-    structured = "structured" if item.get("structured_program") else "role"
+    if item.get("industrial_doctoral"):
+        structured = "industrial_doctoral"
+    elif item.get("doctoral_program"):
+        structured = "doctoral"
+    else:
+        structured = "structured" if item.get("structured_program") else "role"
     score = _float(item.get("score"))
     return [
         (

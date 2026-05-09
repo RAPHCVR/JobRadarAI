@@ -49,6 +49,17 @@ major_cities = [
   "Munich",
   "Singapore",
   "Luxembourg",
+  "Vienna",
+  "Stockholm",
+  "Copenhagen",
+  "Oslo",
+  "Helsinki",
+  "Barcelona",
+  "Madrid",
+  "Lisbon",
+  "Tallinn",
+  "Warsaw",
+  "Prague",
   "Lyon",
   "Toulouse",
   "Nantes",
@@ -58,8 +69,8 @@ major_cities = [
 ]
 
 [search]
-target_markets = ["ireland", "switzerland", "belgium", "singapore", "france", "netherlands", "luxembourg", "uk", "germany", "remote_europe"]
-primary_locations = ["Dublin", "Ireland", "Zurich", "Geneva", "Lausanne", "Basel", "Brussels", "Belgium", "Singapore", "Paris", "France", "Amsterdam", "Luxembourg", "London"]
+target_markets = ["ireland", "switzerland", "belgium", "singapore", "france", "netherlands", "luxembourg", "uk", "germany", "austria", "sweden", "denmark", "norway", "finland", "spain", "portugal", "estonia", "poland", "czechia", "remote_europe"]
+primary_locations = ["Dublin", "Ireland", "Zurich", "Geneva", "Lausanne", "Basel", "Brussels", "Belgium", "Singapore", "Paris", "France", "Amsterdam", "Luxembourg", "London", "Berlin", "Vienna", "Stockholm", "Copenhagen", "Oslo", "Helsinki", "Barcelona", "Madrid", "Lisbon", "Tallinn", "Warsaw", "Prague"]
 titles = [
   "Senior Data Engineer",
   "Data Engineer",
@@ -78,6 +89,11 @@ titles = [
   "Data Platform Engineer",
   "Research Engineer",
   "AI Research Engineer",
+  "Doctorant CIFRE IA",
+  "Doctorant CIFRE Data",
+  "Industrial PhD AI",
+  "PhD Candidate AI",
+  "Doctoral Researcher AI",
   "Interpretability Engineer",
   "Explainability Engineer",
   "AI Safety Engineer",
@@ -153,6 +169,9 @@ platform = 8
 distributed_systems = 7
 retrieval = 8
 applied_research = 8
+doctoral_research = 5
+cifre = 7
+industrial_phd = 6
 nlp = 7
 information_retrieval = 7
 automation = 6

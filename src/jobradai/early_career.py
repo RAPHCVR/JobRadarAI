@@ -20,6 +20,30 @@ _STRUCTURED_RE = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+_DOCTORAL_RE = re.compile(
+    r"\b("
+    r"cifre|convention industrielle de formation par la recherche|industrial ph\.?d|industrial doctorate|"
+    r"industrial doctoral|ph\.?d candidate|doctoral researcher|doctoral candidate|doctoral student|"
+    r"ph\.?d student|ph\.?d\s+(?:position|project|fellowship|researcher|vacancy|in\b)|"
+    r"doctorant|doctorante|doctorat|thesis|"
+    r"these\s+(?:cifre|de\s+doctorat|en\s+(?:ia|ai|data|machine learning|ml)|sur\s+)"
+    r")\b",
+    re.IGNORECASE,
+)
+_INDUSTRIAL_DOCTORAL_RE = re.compile(
+    r"\b("
+    r"cifre|convention industrielle de formation par la recherche|industrial ph\.?d|industrial doctorate|"
+    r"industrial doctoral|industry doctorate|company-funded ph\.?d|enterprise phd"
+    r")\b",
+    re.IGNORECASE,
+)
+_APPLIED_RESEARCH_CONTEXT_RE = re.compile(
+    r"\b("
+    r"applied research|r&d|research and development|industrial research|industry partner|"
+    r"technology transfer|innovation lab|research engineer|applied scientist|startup|scaleup"
+    r")\b",
+    re.IGNORECASE,
+)
 _EARLY_RE = re.compile(
     r"\b("
     r"new grad|new graduate|early careers?|campus|entry[- ]level|junior|"
@@ -44,7 +68,9 @@ _TECH_RE = re.compile(
     r"data engineer|data engineering|data platform|analytics engineer|data analyst|data science|"
     r"data scientist|ai engineer|artificial intelligence|machine learning|ml engineer|"
     r"software engineer|backend engineer|platform engineer|mlops|llmops|llm|genai|"
-    r"rag|research engineer|applied scientist|nlp|cloud engineer|devops|kubernetes|python|sql"
+    r"generative ai|deep learning|rag|research engineer|applied scientist|nlp|computer vision|"
+    r"natural language processing|reinforcement learning|optimization|optimisation|causal|"
+    r"interpretability|explainability|xai|cloud engineer|devops|kubernetes|python|sql"
     r")\b",
     re.IGNORECASE,
 )
@@ -54,7 +80,11 @@ _TARGET_TITLE_RE = re.compile(
     r"graduate data|data programme|data program|data analytics|analytics|"
     r"ai engineer|artificial intelligence|machine learning|ml engineer|software engineer|"
     r"backend engineer|platform engineer|mlops|llmops|llm|genai|research engineer|"
-    r"applied scientist|nlp|cloud engineer|devops engineer"
+    r"applied scientist|nlp|cloud engineer|devops engineer|"
+    r"cifre|doctorant(?:e)?\s+(?:ia|ai|data|machine learning|ml)|"
+    r"ph\.?d\s+(?:candidate|student)?\s*(?:ai|data|machine learning|ml|computer vision|nlp)|"
+    r"doctoral researcher\s+(?:ai|data|machine learning|ml|computer vision|nlp)|"
+    r"industrial ph\.?d\s+(?:ai|data|machine learning|ml)"
     r")\b",
     re.IGNORECASE,
 )
@@ -101,11 +131,15 @@ def early_career_signal(job: dict[str, Any]) -> dict[str, Any]:
     if not blob:
         return _empty()
 
-    structured = bool(_STRUCTURED_RE.search(blob))
+    industrial_doctoral = bool(_INDUSTRIAL_DOCTORAL_RE.search(blob))
+    title_starts_with_phd = title_only_blob.startswith(("phd ", "ph.d "))
+    doctoral_program = industrial_doctoral or title_starts_with_phd or bool(_DOCTORAL_RE.search(title_context_blob))
+    applied_research_context = bool(_APPLIED_RESEARCH_CONTEXT_RE.search(blob))
+    structured = bool(_STRUCTURED_RE.search(blob)) or industrial_doctoral
     graduate_role = bool(_GRADUATE_ROLE_RE.search(title_only_blob))
     early_role = bool(_EARLY_RE.search(title_context_blob))
     early_context = bool(_EARLY_CONTEXT_RE.search(blob))
-    early = early_role or early_context or graduate_role
+    early = early_role or early_context or graduate_role or doctoral_program
     if not structured and not early:
         return _empty()
 
@@ -117,23 +151,39 @@ def early_career_signal(job: dict[str, Any]) -> dict[str, Any]:
     signals: list[str] = []
     risks: list[str] = []
     if structured:
-        signals.append("programme structure graduate/early-careers")
+        signals.append(
+            "doctorat industriel/CIFRE structure"
+            if industrial_doctoral
+            else "programme structure graduate/early-careers"
+        )
     elif graduate_role:
         signals.append("role graduate tech explicite")
+    elif doctoral_program:
+        signals.append("signal doctorat/PhD recherche")
     elif early_role or graduate_role:
         signals.append("niveau junior/new-grad explicite")
     elif early_context:
         signals.append("contexte campus/early-careers explicite")
     if tech:
         signals.append("signal data/AI/software")
+    if doctoral_program and applied_research_context:
+        signals.append("contexte recherche appliquee/R&D")
     if business_only:
         risks.append("programme business/generaliste peu technique")
+    if doctoral_program and not industrial_doctoral:
+        risks.append("doctorat academique: statut/salaire a verifier")
     if internship:
         risks.append("stage/alternance detecte")
     if title_mismatch:
         risks.append("titre hors coeur data/AI engineering")
 
     if internship or title_mismatch:
+        fit = "low"
+    elif doctoral_program and industrial_doctoral and tech and (title_target or applied_research_context):
+        fit = "high"
+    elif doctoral_program and tech and (title_target or applied_research_context):
+        fit = "medium"
+    elif doctoral_program:
         fit = "low"
     elif tech and structured and title_target:
         fit = "high"
@@ -147,6 +197,8 @@ def early_career_signal(job: dict[str, Any]) -> dict[str, Any]:
     return {
         "is_early_career": True,
         "structured_program": structured,
+        "doctoral_program": doctoral_program,
+        "industrial_doctoral": industrial_doctoral,
         "early_career_fit": fit,
         "signals": signals[:4],
         "risks": risks[:4],
@@ -157,8 +209,12 @@ def early_career_score(job: dict[str, Any]) -> tuple[float, str]:
     signal = early_career_signal(job)
     fit = signal["early_career_fit"]
     if fit == "high":
+        if signal.get("industrial_doctoral"):
+            return 88.0, "Doctorat industriel/CIFRE technique: tres compatible profil recherche"
         return 88.0, "Graduate/early-career structure et technique: tres compatible new-grad"
     if fit == "medium":
+        if signal.get("doctoral_program"):
+            return 72.0, "Signal doctorat/PhD technique compatible, statut et salaire a verifier"
         return 72.0, "Signal graduate/junior compatible, fit technique a verifier"
     if fit == "low":
         return 38.0, "Signal early-career detecte mais programme peu technique ou trop stage"
@@ -173,6 +229,8 @@ def _empty() -> dict[str, Any]:
     return {
         "is_early_career": False,
         "structured_program": False,
+        "doctoral_program": False,
+        "industrial_doctoral": False,
         "early_career_fit": "none",
         "signals": [],
         "risks": [],

@@ -6,6 +6,7 @@ import re
 from typing import Callable
 
 from jobradai.config import AppConfig
+from jobradai.enrichment import populate_structured_job_fields
 from jobradai.http import HttpClient
 from jobradai.models import Job, SourceRun
 from jobradai.redaction import redact_sensitive
@@ -22,13 +23,22 @@ from jobradai.sources.optional import (
 )
 from jobradai.sources.public import (
     fetch_actiris,
+    fetch_academictransfer,
     fetch_arbeitnow,
+    fetch_bundesagentur,
     fetch_business_france_vie,
+    fetch_doctorat_gouv,
+    fetch_euraxess,
     fetch_forem,
+    fetch_germantechjobs,
     fetch_himalayas,
+    fetch_jobtechdev_sweden,
     fetch_jobicy,
+    fetch_nav_norway,
     fetch_remoteok,
     fetch_remotive,
+    fetch_swissdevjobs,
+    fetch_weworkremotely,
 )
 
 
@@ -47,6 +57,15 @@ def run_pipeline(config: AppConfig, max_per_source: int | None = None) -> Pipeli
         ("business_france_vie", fetch_business_france_vie),
         ("forem", fetch_forem),
         ("actiris", fetch_actiris),
+        ("bundesagentur", fetch_bundesagentur),
+        ("jobtechdev_sweden", fetch_jobtechdev_sweden),
+        ("nav_norway", fetch_nav_norway),
+        ("euraxess", fetch_euraxess),
+        ("doctorat_gouv", fetch_doctorat_gouv),
+        ("academictransfer", fetch_academictransfer),
+        ("weworkremotely", fetch_weworkremotely),
+        ("swissdevjobs", fetch_swissdevjobs),
+        ("germantechjobs", fetch_germantechjobs),
         ("remotive", fetch_remotive),
         ("arbeitnow", fetch_arbeitnow),
         ("remoteok", fetch_remoteok),
@@ -91,6 +110,7 @@ def run_pipeline(config: AppConfig, max_per_source: int | None = None) -> Pipeli
         _collect(name, optional_call, jobs, source_runs, max_per_source, skip_empty_run_already_recorded=True)
 
     jobs = dedupe_jobs(jobs)
+    jobs = populate_structured_job_fields(jobs, config.profile)
     jobs = score_jobs(jobs, config.profile, config.markets)
     target_markets = set(config.profile.get("search", {}).get("target_markets", []))
     if target_markets:
@@ -193,6 +213,7 @@ def _companies_similar(a: str, b: str) -> bool:
 def _source_rank(source_type: str) -> int:
     return {
         "official_api": 5,
+        "official_portal": 4,
         "ats": 4,
         "paid_api": 3,
         "public_api": 2,

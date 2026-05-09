@@ -1,5 +1,7 @@
 # Live Audit 2026-05-08
 
+Archive historique. L'etat courant et les extensions post-run sont centralises dans `docs/CURRENT_STATUS.md`; les commandes dans `docs/OPERATIONS.md`; les sources dans `docs/SOURCES.md`.
+
 Audit realise le 2026-05-08, Europe/Paris. Le run manuel complet a ete relance apres retrait VDAB/SerpAPI du chemin actif, ajout de nouveaux ATS IA/data, ajout du link-check, du registre multi-run et des snapshots historiques.
 
 ## Verdict

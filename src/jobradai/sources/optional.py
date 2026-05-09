@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import shutil
@@ -7,6 +8,7 @@ import subprocess
 import urllib.error
 import urllib.parse
 import urllib.request
+from pathlib import Path
 from typing import Any
 
 from jobradai.http import HttpClient, HttpError
@@ -15,6 +17,7 @@ from jobradai.queries import select_query_items, select_query_terms
 from jobradai.text import clean_html, normalize_space, text_blob
 
 JOBSPY_PACKAGE = os.getenv("JOBRADAR_JOBSPY_PACKAGE", "python-jobspy==1.1.82")
+JOBSPY_DEFAULT_TIMEOUT_SECONDS = 240
 
 
 def fetch_adzuna(config: dict[str, Any], http: HttpClient) -> tuple[list[Job], str]:
@@ -22,10 +25,17 @@ def fetch_adzuna(config: dict[str, Any], http: HttpClient) -> tuple[list[Job], s
     app_key = os.getenv("ADZUNA_APP_KEY")
     if not app_id or not app_key:
         return [], "missing_config: ADZUNA_APP_ID/ADZUNA_APP_KEY absents"
-    countries = ["fr", "gb", "de", "at", "pl"]
+    settings = dict(config.get("adzuna", {}))
+    countries = [
+        normalize_space(str(country)).lower()
+        for country in settings.get("countries", ["fr", "gb", "de", "at", "pl"])
+        if normalize_space(str(country))
+    ]
+    max_queries = int(settings.get("max_queries", 16) or 16)
+    results_per_page = max(1, min(int(settings.get("results_per_page", 30) or 30), 50))
     jobs: list[Job] = []
     for country in countries:
-        for query in select_query_items(config, limit=16, early_career_min=4):
+        for query in select_query_items(config, limit=max_queries, early_career_min=4):
             term = query.get("term", "")
             url = f"https://api.adzuna.com/v1/api/jobs/{country}/search/1"
             data = http.fetch_json(
@@ -33,7 +43,7 @@ def fetch_adzuna(config: dict[str, Any], http: HttpClient) -> tuple[list[Job], s
                 {
                     "app_id": app_id,
                     "app_key": app_key,
-                    "results_per_page": 30,
+                    "results_per_page": results_per_page,
                     "what": term,
                     "content-type": "application/json",
                     "sort_by": "date",
@@ -220,6 +230,7 @@ def fetch_jobspy_direct(config: dict[str, Any], http: HttpClient) -> tuple[list[
     if os.getenv("JOBRADAR_JOBSPY_LINKEDIN", "").lower() in {"1", "true", "yes"}:
         settings["include_linkedin"] = True
     max_queries = int(settings.get("max_queries", 8) or 8)
+    timeout_seconds = _jobspy_timeout_seconds(settings)
     queries = select_query_items(config, limit=max_queries, early_career_min=3)
     payload = json.dumps({"queries": queries, "settings": settings}, ensure_ascii=False)
     command = [
@@ -234,19 +245,9 @@ def fetch_jobspy_direct(config: dict[str, Any], http: HttpClient) -> tuple[list[
         str(script),
     ]
     try:
-        completed = subprocess.run(
-            command,
-            input=payload,
-            cwd=root,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            capture_output=True,
-            timeout=900,
-            check=False,
-        )
+        completed = _run_text_command(command, input_text=payload, cwd=root, timeout_seconds=timeout_seconds)
     except subprocess.TimeoutExpired:
-        return [], "JobSpy direct timeout apres 900s"
+        return [], f"JobSpy direct timeout apres {timeout_seconds}s"
     if completed.returncode != 0:
         error = (completed.stderr or completed.stdout).strip().splitlines()[-8:]
         return [], "JobSpy direct erreur: " + " | ".join(error)[:600]
@@ -279,6 +280,58 @@ def fetch_jobspy_direct(config: dict[str, Any], http: HttpClient) -> tuple[list[
             )
         )
     return jobs, ""
+
+
+def _jobspy_timeout_seconds(settings: dict[str, Any]) -> int:
+    try:
+        configured = int(settings.get("timeout_seconds", JOBSPY_DEFAULT_TIMEOUT_SECONDS) or JOBSPY_DEFAULT_TIMEOUT_SECONDS)
+    except (TypeError, ValueError):
+        configured = JOBSPY_DEFAULT_TIMEOUT_SECONDS
+    return max(30, min(configured, 900))
+
+
+def _run_text_command(
+    command: list[str],
+    *,
+    input_text: str,
+    cwd: Path,
+    timeout_seconds: int,
+) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(
+        command,
+        cwd=cwd,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = process.communicate(input=input_text, timeout=timeout_seconds)
+    except subprocess.TimeoutExpired as exc:
+        _terminate_process_tree(process.pid)
+        try:
+            stdout, stderr = process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            stdout, stderr = "", ""
+        exc.output = stdout
+        exc.stderr = stderr
+        raise
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+def _terminate_process_tree(pid: int) -> None:
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(pid), "/T", "/F"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        return
+    with contextlib.suppress(Exception):
+        os.kill(pid, 9)
 
 
 def fetch_france_travail(config: dict[str, Any], http: HttpClient) -> tuple[list[Job], str]:
@@ -337,7 +390,22 @@ def fetch_france_travail(config: dict[str, Any], http: HttpClient) -> tuple[list
 def _france_travail_terms(config: dict[str, Any], *, max_queries: int = 22) -> list[str]:
     base_limit = max(1, min(max_queries, 18))
     terms = select_query_terms(config, limit=base_limit, early_career_min=4)
-    terms.extend(["ingénieur data", "ingénieur IA", "architecte data", "MLOps", "LLM", "RAG"])
+    terms.extend(
+        [
+            "ingénieur data",
+            "ingénieur IA",
+            "architecte data",
+            "MLOps",
+            "LLM",
+            "RAG",
+            "ingénieur machine learning",
+            "développeur IA",
+            "analyste data",
+            "consultant data",
+            "business intelligence",
+            "Power BI",
+        ]
+    )
     return _dedupe_terms(terms)[:max(1, max_queries)]
 
 
@@ -397,8 +465,6 @@ def _quick_health(base: str) -> bool:
 
 
 def _project_root():
-    from pathlib import Path
-
     return Path(__file__).resolve().parents[3]
 
 
