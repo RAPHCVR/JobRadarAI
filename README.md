@@ -23,17 +23,17 @@ Le projet est volontairement local et humain-dans-la-boucle:
 
 ## Etat Court
 
-Dernier full run valide documente: **2026-05-08 21:34 Europe/Paris**.
+Dernier full run valide documente: **2026-05-09 16:43 Europe/Paris**.
 
-- 2895 offres retenues.
-- 43 sources OK, 2 sources ignorees attendues, 0 erreur.
-- 364 missions VIE Business France.
+- 4815 offres retenues.
+- 58 sources OK, 2 sources ignorees attendues, 0 erreur.
+- 532 missions VIE Business France.
 - 200 offres jugees par le LLM en mode `balanced`.
-- 166 liens verifies en mode priority-aware.
-- 108 items dans la queue multi-run dedupee.
+- 236 liens verifies en mode priority-aware.
+- 177 items dans la queue multi-run dedupee.
 - Tache Windows `JobRadarAI-Daily`: **desactivee**.
 
-Depuis ce full run, des extensions post-run ont ete ajoutees et validees par tests/smoke cibles: Bundesagentur Jobsuche, SmartRecruiters durci, Delivery Hero filtre, correction du matching marche par alias bornes, JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS, Doctorat.gouv.fr, AcademicTransfer, WeWorkRemotely RSS, SwissDevJobs, GermanTechJobs, champs structures `deadline`/`language_check`/`remote_location_validity`/`required_years`/`experience_check`/salaire annualise EUR, extension graduate/early-career/doctorat industriel-CIFRE, et extension opportuniste Autriche/Nordics/Espagne/Portugal/Estonie/Pologne/Tchequie. Les volumes exacts seront mis a jour au prochain full run.
+Le full run inclut les extensions ajoutees pendant l'audit: Bundesagentur Jobsuche, SmartRecruiters durci, Delivery Hero filtre, correction du matching marche par alias bornes, JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS, Doctorat.gouv.fr, AcademicTransfer, WeWorkRemotely RSS, SwissDevJobs, GermanTechJobs, champs structures `deadline`/`language_check`/`remote_location_validity`/`required_years`/`experience_check`/salaire annualise EUR, extension graduate/early-career/doctorat industriel-CIFRE, et extension opportuniste Autriche/Nordics/Espagne/Portugal/Estonie/Pologne/Tchequie.
 
 ## Lancer
 

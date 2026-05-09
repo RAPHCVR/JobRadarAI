@@ -99,7 +99,7 @@
 - Stage courant: Aubay AI Researcher, fev. 2026 a juil. 2026.
 - Demarrage cible: aout/septembre 2026; a confirmer avec RH quand l'offre ne publie pas de date ou indique ASAP/immediat.
 
-## Extension Post-Run 2026-05-09
+## Extension Validee Le 2026-05-09
 
 - Marches ajoutes au scoring: Autriche, Suede, Danemark, Norvege, Finlande, Espagne, Portugal, Estonie, Pologne, Tchequie.
 - Sources officielles/verticales ajoutees: JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS.
@@ -111,18 +111,28 @@
 
 ## Audit Dernier Run
 
-Run valide du 2026-05-08 18:49 Europe/Paris:
+Run valide du 2026-05-09 16:43 Europe/Paris:
 
-- UK: 505 offres, marche AI/data fort mais visa hors UE.
-- France: 447 offres, meilleur fit langue/visa/proximite.
-- Irlande: 350 offres, cible anglophone UE prioritaire.
-- Allemagne: 327 offres, gros volume a filtrer par langue.
-- Belgique: 323 offres, bon fit FR/EN/UE, renforce via Forem et Actiris.
-- Remote Europe: 296 offres.
+- France: 822 offres, meilleur fit langue/visa/proximite.
+- Allemagne: 655 offres, gros volume a filtrer par langue.
+- UK: 579 offres, marche AI/data fort mais visa hors UE.
+- Irlande: 345 offres, cible anglophone UE prioritaire.
+- Belgique: 303 offres, bon fit FR/EN/UE, renforce via Forem et Actiris.
+- Remote Europe: 297 offres.
+- Espagne: 292 offres, opportuniste si salaire/fit solides.
 - Singapour: 260 offres, marche AI anglophone mais relocation/visa.
-- Pays-Bas: 189 offres.
-- Suisse: 60 offres.
-- Luxembourg: 31 offres.
-- Remote/hybride detecte: 1303 offres.
-- Salaire publie hors VIE: 79 offres, dont 64 >= 45k EUR.
-- VIE Business France: 364 missions retenues, indemnite mensuelle observee de 2607 a 4427 EUR.
+- Pays-Bas: 229 offres.
+- Suede: 218 offres.
+- Suisse: 207 offres, premium salaire mais marche selectif/permis a verifier.
+- Pologne: 111 offres.
+- Norvege: 105 offres.
+- Portugal: 104 offres.
+- Autriche: 100 offres.
+- Danemark: 72 offres.
+- Tchequie: 50 offres.
+- Finlande: 32 offres.
+- Luxembourg: 32 offres.
+- Estonie: 2 offres.
+- Remote/hybride detecte: 2057 offres.
+- Salaire publie hors VIE: 507 offres, dont 452 >= 45k EUR.
+- VIE Business France: 532 missions retenues, indemnite mensuelle observee de 2610 a 4427 EUR.

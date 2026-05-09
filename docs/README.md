@@ -16,7 +16,7 @@ Ce dossier separe les documents vivants des preuves historiques. La source de ve
 
 | Document | Role |
 |---|---|
-| [LIVE_AUDIT_2026-05-08.md](LIVE_AUDIT_2026-05-08.md) | Preuve historique du run/audit 2026-05-08 avant les extensions post-run |
+| [LIVE_AUDIT_2026-05-08.md](LIVE_AUDIT_2026-05-08.md) | Preuve historique du run/audit 2026-05-08, conservee comme archive non canonique |
 
 Les anciens audits dates strictement remplaces ne doivent pas redevenir docs principales. Si un futur audit apporte une preuve utile, garder un seul audit archive recent et reporter l'etat courant dans `CURRENT_STATUS.md`.
 

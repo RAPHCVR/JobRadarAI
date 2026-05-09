@@ -15,21 +15,19 @@ Le projet suit ce modele. Il est utilisable en routine manuelle ou quotidienne d
 
 ## Etat Runtime Valide
 
-Dernier full run complet valide documente: **2026-05-08 21:34 Europe/Paris**.
+Dernier full run complet valide documente: **2026-05-09 16:43 Europe/Paris**.
 
-Note post-audit du **2026-05-08/09**: Bundesagentur Jobsuche, Delivery Hero SmartRecruiters filtre, correction du matching pays, JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS, Doctorat.gouv.fr, AcademicTransfer, WeWorkRemotely RSS, SwissDevJobs, GermanTechJobs, champs structures P2 dont `required_years`/`experience_check`, et extension Autriche/Nordics/Espagne/Portugal/Estonie/Pologne/Tchequie ont ete ajoutes et valides par tests/smoke cibles apres ce full run. Les compteurs ci-dessous restent ceux du run complet indique.
-
-- 2895 offres retenues.
-- 43 sources OK.
+- 4815 offres retenues.
+- 58 sources OK.
 - 2 skips attendus: Adzuna sans credentials, JobSpy API local injoignable.
 - 0 erreur source.
-- 364 VIE retenus.
+- 532 VIE retenus.
 - 200 offres jugees par le LLM en `balanced`.
-- 166 liens verifies en mode priority-aware.
-- Snapshot: `runs/history/final-20260508-expanded-github-ready-v3`.
+- 236 liens verifies en mode priority-aware.
+- Snapshot: `runs/history/20260509-160240`.
 - Registre multi-run: `runs/history/job_history.sqlite`.
-- Queue dedupee: `runs/latest/application_queue.md`, 108 items sur le dernier run apres durcissement `too_senior`/signaux structures.
-- Historique: 302 nouvelles offres, 358 disparues marquees `stale`, 0 `expired`.
+- Queue dedupee: `runs/latest/application_queue.md`, 177 items apres durcissement `too_senior`/signaux structures.
+- Historique: 2233 nouvelles offres, 3 revenues, 671 disparues marquees `stale`, 0 `expired`.
 - P0: aucun blocage runtime detecte.
 
 ## Repos Et Systemes Audites
@@ -63,7 +61,7 @@ Note post-audit du **2026-05-08/09**: Bundesagentur Jobsuche, Delivery Hero Smar
 - SerpAPI Google Jobs: desactive volontairement; quota trop faible.
 - VDAB: desactive volontairement; acces public/partenaire bloque, pas une action restante.
 - Adzuna: configure en option multi-pays, mais inactif sans credentials. A activer seulement si les cles sont disponibles et si le ratio signal/bruit est bon au smoke.
-- LLM judge OpenAI-compatible: implemente avec `gpt-5.4-mini`, effort `high`, batchs de 5 pour eviter les timeouts proxy.
+- LLM judge OpenAI-compatible: implemente avec `gpt-5.4-mini`; le run quotidien peut utiliser `high`, et le run large valide a utilise `medium` + batchs de 5 pour rester stable sur 200 offres.
 
 ## Garde-Fous Mis En Place
 
@@ -82,6 +80,7 @@ Note post-audit du **2026-05-08/09**: Bundesagentur Jobsuche, Delivery Hero Smar
 - Tokenisation scoring multi-mots: `distributed systems`, `data quality`, `GitHub Actions`, `Azure DevOps`, etc.
 - Seuil local a 35 pour garder un corpus de revue large; shortlist finale par judge LLM et priorites explicites.
 - Jobicy rate-limit 429 traite en best-effort.
+- JobSpy Direct est execute avec stdout/stderr vers fichiers temporaires et timeout process-tree sur Windows; cela evite qu'un enfant garde un pipe ouvert et bloque le run.
 - `runs/latest/audit.md` verifie P0/P1/P2, langues, VIE, visa, salaire, remote et liens.
 - L'audit remonte explicitement un P0/P1 si le corpus est vide, si `sources.json` est absent/illisible, si la shortlist est stale, ou si le link-check manque.
 - Les timeouts socket du judge LLM sont convertis en erreur controlee pour permettre fallbacks endpoint et retries.
@@ -102,8 +101,8 @@ Note post-audit du **2026-05-08/09**: Bundesagentur Jobsuche, Delivery Hero Smar
 ## Reste A Faire
 
 - `P0`: aucun blocage runtime detecte sur le dernier run complet.
-- `P1`: verifier manuellement les 43 liens `browser_required` avant candidature, surtout Indeed/JobSpy et pages protegees Ashby.
-- `P1`: verifier manuellement les 11 liens `needs_review/server_error` avant candidature.
+- `P1`: verifier manuellement les 89 liens `browser_required` avant candidature, surtout Indeed/JobSpy et pages protegees/anti-bot.
+- `P1`: verifier manuellement les 15 liens `needs_review/server_error` avant candidature.
 - `P1`: verifier manuellement salaire et remote quand l'offre ne publie pas l'information ou quand le LLM marque `unknown`/`weak`.
 - `P2`: confirmer avec RH les dates de demarrage `unknown`/`too_soon`; ne pas filtrer automatiquement sur ce signal.
 - `P2`: traiter `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux de tri et de verification; `too_senior` doit rester hors queue actionnable sauf signal junior/all-levels explicite.
