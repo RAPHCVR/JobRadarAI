@@ -93,6 +93,12 @@ docker push ghcr.io/raphcvr/jobradarai-web:latest
 
 Les donnees de runs, CV et secrets ne sont pas commites ni bakees dans l'image. Voir [docs/WEB_PLATFORM.md](docs/WEB_PLATFORM.md).
 
+Pour rapatrier les statuts/notes saisis dans l'interface:
+
+```powershell
+.\scripts\pull_web_state.ps1
+```
+
 ## Fichiers Importants
 
 - `config/profile.toml`: profil cible, contraintes, titres et poids de scoring.

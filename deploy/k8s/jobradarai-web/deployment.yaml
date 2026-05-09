@@ -48,6 +48,10 @@ spec:
               value: "true"
             - name: JOBRADAR_WEB_SESSION_DAYS
               value: "14"
+            - name: JOBRADAR_WEB_LOGIN_MAX_ATTEMPTS
+              value: "8"
+            - name: JOBRADAR_WEB_LOGIN_WINDOW_SECONDS
+              value: "600"
           envFrom:
             - secretRef:
                 name: jobradarai-web-secret

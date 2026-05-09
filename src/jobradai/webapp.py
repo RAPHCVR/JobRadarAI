@@ -8,6 +8,7 @@ import mimetypes
 import os
 import secrets
 import threading
+import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -45,6 +46,8 @@ PATCHABLE_FIELDS = {
     "last_contacted_at",
 }
 SESSION_COOKIE = "jobradar_session"
+DEFAULT_LOGIN_ATTEMPTS = 8
+DEFAULT_LOGIN_WINDOW_SECONDS = 10 * 60
 
 
 @dataclass(frozen=True)
@@ -127,6 +130,41 @@ class WebAuth:
     def _sign(self, payload: str) -> str:
         digest = hmac.new(self.session_secret.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).digest()
         return _b64(digest)
+
+
+class LoginRateLimiter:
+    def __init__(self, *, max_attempts: int = DEFAULT_LOGIN_ATTEMPTS, window_seconds: int = DEFAULT_LOGIN_WINDOW_SECONDS) -> None:
+        self.max_attempts = max(1, max_attempts)
+        self.window_seconds = max(60, window_seconds)
+        self._failures: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    @classmethod
+    def from_env(cls) -> "LoginRateLimiter":
+        max_attempts = _int_env("JOBRADAR_WEB_LOGIN_MAX_ATTEMPTS", DEFAULT_LOGIN_ATTEMPTS)
+        window_seconds = _int_env("JOBRADAR_WEB_LOGIN_WINDOW_SECONDS", DEFAULT_LOGIN_WINDOW_SECONDS)
+        return cls(max_attempts=max_attempts, window_seconds=window_seconds)
+
+    def blocked(self, key: str) -> bool:
+        with self._lock:
+            failures = self._fresh_failures(key)
+            return len(failures) >= self.max_attempts
+
+    def record_failure(self, key: str) -> None:
+        with self._lock:
+            failures = self._fresh_failures(key)
+            failures.append(time.monotonic())
+            self._failures[key] = failures
+
+    def record_success(self, key: str) -> None:
+        with self._lock:
+            self._failures.pop(key, None)
+
+    def _fresh_failures(self, key: str) -> list[float]:
+        cutoff = time.monotonic() - self.window_seconds
+        failures = [value for value in self._failures.get(key, []) if value >= cutoff]
+        self._failures[key] = failures
+        return failures
 
 
 class WebDataStore:
@@ -451,6 +489,8 @@ def run_web_app(
 
 
 def make_handler(*, store: WebDataStore, static_dir: Path, auth: WebAuth | None):
+    login_limiter = LoginRateLimiter.from_env() if auth is not None else None
+
     class JobRadarRequestHandler(SimpleHTTPRequestHandler):
         def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
             print(f"{self.address_string()} - {format % args}")
@@ -502,6 +542,9 @@ def make_handler(*, store: WebDataStore, static_dir: Path, auth: WebAuth | None)
 
         def do_PATCH(self) -> None:
             parsed = urlparse(self.path)
+            if not self._origin_allowed():
+                self._error(HTTPStatus.FORBIDDEN, "Origine non autorisee.")
+                return
             if not self._authenticated():
                 self._error(HTTPStatus.UNAUTHORIZED, "Authentification requise.")
                 return
@@ -522,6 +565,9 @@ def make_handler(*, store: WebDataStore, static_dir: Path, auth: WebAuth | None)
 
         def do_POST(self) -> None:
             parsed = urlparse(self.path)
+            if not self._origin_allowed():
+                self._error(HTTPStatus.FORBIDDEN, "Origine non autorisee.")
+                return
             if parsed.path == "/api/login":
                 self._login()
                 return
@@ -549,6 +595,10 @@ def make_handler(*, store: WebDataStore, static_dir: Path, auth: WebAuth | None)
             if auth is None:
                 self._json({"authenticated": True})
                 return
+            login_key = self.client_address[0] if self.client_address else "unknown"
+            if login_limiter and login_limiter.blocked(login_key):
+                self._error(HTTPStatus.TOO_MANY_REQUESTS, "Trop de tentatives. Reessaie plus tard.")
+                return
             try:
                 payload = self._read_body()
             except ValueError as exc:
@@ -556,8 +606,12 @@ def make_handler(*, store: WebDataStore, static_dir: Path, auth: WebAuth | None)
                 return
             password = str(payload.get("password") or "")
             if not auth.check_password(password):
+                if login_limiter:
+                    login_limiter.record_failure(login_key)
                 self._error(HTTPStatus.UNAUTHORIZED, "Mot de passe invalide.")
                 return
+            if login_limiter:
+                login_limiter.record_success(login_key)
             self._json({"authenticated": True}, extra_headers={"Set-Cookie": auth.issue_cookie()})
 
         def _logout(self) -> None:
@@ -577,6 +631,16 @@ def make_handler(*, store: WebDataStore, static_dir: Path, auth: WebAuth | None)
                 if sep and name == SESSION_COOKIE and auth.validate_cookie(value):
                     return True
             return False
+
+        def _origin_allowed(self) -> bool:
+            origin = self.headers.get("origin", "").strip()
+            if not origin:
+                return True
+            host = (self.headers.get("x-forwarded-host") or self.headers.get("host") or "").split(",", 1)[0].strip()
+            forwarded_proto = (self.headers.get("x-forwarded-proto") or "").split(",", 1)[0].strip()
+            proto = forwarded_proto or ("https" if auth and auth.cookie_secure else "http")
+            configured = os.environ.get("JOBRADAR_WEB_ALLOWED_ORIGINS", "")
+            return origin_allowed(origin=origin, host=host, proto=proto, configured=configured)
 
         def _serve_static(self, route: str) -> None:
             if not static_dir.exists():
@@ -639,6 +703,10 @@ def make_handler(*, store: WebDataStore, static_dir: Path, auth: WebAuth | None)
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("X-Frame-Options", "SAMEORIGIN")
             self.send_header("Referrer-Policy", "same-origin")
+            self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+            self.send_header("Cross-Origin-Opener-Policy", "same-origin")
+            if auth and auth.cookie_secure and os.environ.get("JOBRADAR_WEB_HSTS", "true").lower() not in {"0", "off", "false", "no"}:
+                self.send_header("Strict-Transport-Security", "max-age=15552000; includeSubDomains")
             self.send_header(
                 "Content-Security-Policy",
                 "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
@@ -655,3 +723,19 @@ def _b64(data: bytes) -> str:
 def _unb64(value: str) -> bytes:
     padding = "=" * (-len(value) % 4)
     return base64.urlsafe_b64decode(value + padding)
+
+
+def origin_allowed(*, origin: str, host: str, proto: str, configured: str = "") -> bool:
+    if not origin:
+        return True
+    allowed = {item.strip().rstrip("/") for item in configured.split(",") if item.strip()}
+    if host:
+        allowed.add(f"{proto}://{host}".rstrip("/"))
+    return origin.rstrip("/") in allowed
+
+
+def _int_env(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default

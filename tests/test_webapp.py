@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from jobradai.webapp import WebAuth, filter_jobs, validate_state_patch
+from jobradai.webapp import LoginRateLimiter, WebAuth, filter_jobs, origin_allowed, validate_state_patch
 
 
 class WebAppTests(unittest.TestCase):
@@ -43,6 +43,30 @@ class WebAppTests(unittest.TestCase):
         self.assertFalse(auth.check_password("wrong"))
         self.assertTrue(auth.validate_cookie(token))
         self.assertFalse(auth.validate_cookie(token + "tampered"))
+
+    def test_login_rate_limiter_blocks_after_failed_attempts_and_resets_on_success(self) -> None:
+        limiter = LoginRateLimiter(max_attempts=2, window_seconds=60)
+
+        self.assertFalse(limiter.blocked("ip"))
+        limiter.record_failure("ip")
+        self.assertFalse(limiter.blocked("ip"))
+        limiter.record_failure("ip")
+        self.assertTrue(limiter.blocked("ip"))
+        limiter.record_success("ip")
+        self.assertFalse(limiter.blocked("ip"))
+
+    def test_origin_allowed_accepts_same_forwarded_origin_and_configured_origin(self) -> None:
+        self.assertTrue(origin_allowed(origin="", host="jobs.raphcvr.me", proto="https"))
+        self.assertTrue(origin_allowed(origin="https://jobs.raphcvr.me", host="jobs.raphcvr.me", proto="https"))
+        self.assertTrue(
+            origin_allowed(
+                origin="https://admin.raphcvr.me",
+                host="jobs.raphcvr.me",
+                proto="https",
+                configured="https://admin.raphcvr.me",
+            )
+        )
+        self.assertFalse(origin_allowed(origin="https://evil.example", host="jobs.raphcvr.me", proto="https"))
 
     def test_cv_metadata_can_use_runs_cv_folder(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

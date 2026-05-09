@@ -132,6 +132,12 @@ docker push ghcr.io/raphcvr/jobradarai-web:latest
 
 Details: `docs/WEB_PLATFORM.md`.
 
+Backup des statuts/notes web vers le poste local:
+
+```powershell
+.\scripts\pull_web_state.ps1
+```
+
 Digest graduate/early-careers/doctorats seul:
 
 ```powershell

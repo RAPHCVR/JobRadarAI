@@ -21,6 +21,8 @@ L'interface expose:
 - Auth obligatoire en prod via `JOBRADAR_WEB_PASSWORD`.
 - Cookie de session signe par `JOBRADAR_WEB_SESSION_SECRET`, `HttpOnly`, `SameSite=Lax`, `Secure` en Kubernetes.
 - `JOBRADAR_WEB_API_TOKEN` optionnel pour appels API en `Authorization: Bearer`.
+- Limite de tentatives login en memoire: `JOBRADAR_WEB_LOGIN_MAX_ATTEMPTS` sur `JOBRADAR_WEB_LOGIN_WINDOW_SECONDS`.
+- Les mutations API refusent les requetes avec un `Origin` different du host public, sauf allowlist explicite `JOBRADAR_WEB_ALLOWED_ORIGINS`.
 - Image Docker sans `runs/`, sans `private/`, sans `config/.env`.
 - Donnees montees dans le PVC `jobradarai-data`.
 - Pod non-root, token service account desactive, root filesystem read-only.
@@ -87,6 +89,14 @@ Synchroniser le dernier run local vers le PVC:
 ```
 
 Ce script copie `runs/latest` et, si presents, `private/main.tex` et `private/main.pdf` vers `/app/runs/cv` dans le PVC. Il ne copie pas `runs/state/application_state.json` par defaut pour eviter d'ecraser les statuts saisis dans l'interface.
+
+Rapatrier les statuts/notes saisis dans l'interface:
+
+```powershell
+.\scripts\pull_web_state.ps1
+```
+
+Le fichier local produit est `runs/state/application_state.from-web.json`, ignore par Git. Pour remplacer volontairement l'etat local de reference, renommer ensuite ce fichier en `runs/state/application_state.json` puis relancer `sync_web_data.ps1 -IncludeState`.
 
 ## Rotation Secret
 

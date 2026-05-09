@@ -195,6 +195,7 @@ Verdict: la couche marche et reste correctement secondaire. Elle capture les gra
 - Extension des titres/requetes: `ML Engineer`, `AI/ML Engineer`, `ML Ops Engineer`, `AI Research Engineer`, `LLM Research Engineer`, `LLM Application Engineer`, `Analytics Engineer` et veille niche `Applied Scientist`/interpretability/explainability/AI safety/knowledge graph/semantic web. Le run `20260509-192018` confirme un signal utile sans explosion de bruit.
 - Workspace nettoye puis pousse sur GitHub.
 - Interface web React/Vite + shadcn-style ajoutee, dockerisee, publiee via GHCR, deployee sur Kubernetes et synchronisee avec `runs/latest`.
+- Durcissement web ajoute: rate-limit login, garde `Origin` sur mutations API, headers HSTS/permissions/COOP.
 - CV PDF genere localement apres installation des paquets TinyTeX manquants (`babel-french`, `fontawesome5`) puis monte dans le PVC web.
 - Secret web initial cree dans Kubernetes; copie locale ignoree par Git dans `runs/state/web_initial_credentials.txt`.
 
@@ -210,6 +211,7 @@ Verdict: la couche marche et reste correctement secondaire. Elle capture les gra
 - `P2/P3`: verifier le bruit des nouveaux titres au prochain run, surtout `Analytics Engineer` et `Applied Scientist`; conserver si le score et le judge remontent bien des roles data/AI/platform/research, pas BI reporting ou research senior hors cible.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
 - `P2`: quand un nouveau run est genere localement, lancer `scripts/sync_web_data.ps1` pour rafraichir la plateforme; ne pas copier `runs/state` sauf migration volontaire des statuts.
+- `P2`: lancer ponctuellement `scripts/pull_web_state.ps1` pour sauvegarder localement les statuts/notes saisis dans l'interface.
 - `P3`: JobSpy API Docker seulement si tu veux une API locale permanente; le mode uv direct suffit aujourd'hui et est timeout-borne.
 - `P3`: WTTJ, DevITJobs-like, Wellfound, ABG, Campus France Doctorat, DAAD/PhDGermany, ETH/EPFL restent des tests ponctuels possibles, pas des manques bloquants du systeme actuel.
 - `PN`: VDAB direct, SerpAPI, Glassdoor JobSpy, ANRT sans compte, EURES API, JobsIreland API, Veolia large et LinkedIn automation sont hors scope routine.

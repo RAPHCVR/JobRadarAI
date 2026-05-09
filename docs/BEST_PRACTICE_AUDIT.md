@@ -101,8 +101,9 @@ Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
 - Les exports CSV neutralisent les formules Excel et le dashboard n'accepte que des liens HTTP(S).
 - Les erreurs HTTP redigent secrets en query/path/body.
 - LinkedIn non automatise en masse.
-- Plateforme web protegee par `JOBRADAR_WEB_PASSWORD`, cookie `HttpOnly`/`SameSite=Lax`/`Secure`, session signee, secret Kubernetes, root filesystem read-only, service account token desactive.
+- Plateforme web protegee par `JOBRADAR_WEB_PASSWORD`, cookie `HttpOnly`/`SameSite=Lax`/`Secure`, session signee, rate-limit login, garde `Origin` sur mutations API, secret Kubernetes, root filesystem read-only, service account token desactive.
 - L'image Docker exclut `runs/`, `private/` et `config/.env`; les donnees live sont synchronisees vers le PVC par `scripts/sync_web_data.ps1`.
+- `scripts/pull_web_state.ps1` permet de rapatrier les statuts/notes du PVC vers un fichier local ignore par Git.
 
 ## Reste A Faire
 
@@ -115,6 +116,7 @@ Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
 - `P2/P3`: surveiller sur les prochains runs le bruit apporte par `Analytics Engineer` et `Applied Scientist`; le premier full run post-extension est correct, mais ces titres doivent rester sous garde-fous niveau/experience.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
 - `P2`: apres chaque gros run local, synchroniser la plateforme web avec `scripts/sync_web_data.ps1`; ne copier `runs/state/application_state.json` qu'en migration explicite.
+- `P2`: sauvegarder regulierement l'etat web avec `scripts/pull_web_state.ps1` si l'interface devient la source principale des statuts de candidature.
 - `P3`: demarrer `rainmanjam/jobspy-api` en Docker seulement si tu veux une API JobSpy permanente au lieu du mode uv direct; le mode direct est maintenant timeout-borne.
 - `P3`: DevITJobs-like/Wellfound/ABG/Campus France Doctorat/DAAD restent des tests ponctuels possibles, mais ne sont pas prioritaires apres l'ajout EURAXESS + Doctorat.gouv.fr + AcademicTransfer + RSS tech.
 - `PN`: VDAB direct, SerpAPI, Glassdoor JobSpy, ANRT sans compte, EURES API, JobsIreland API et Veolia large ne sont plus des pistes actives. On les garde hors scope tant que l'acces/ratio signal-bruit ne change pas.
