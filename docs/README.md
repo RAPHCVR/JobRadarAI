@@ -12,13 +12,9 @@ Ce dossier separe les documents vivants des preuves historiques. La source de ve
 | [MARKET_STRATEGY.md](MARKET_STRATEGY.md) | Priorites pays, titres, signaux forts/faibles et contraintes personnelles |
 | [BEST_PRACTICE_AUDIT.md](BEST_PRACTICE_AUDIT.md) | Audit systeme, garde-fous, architecture et reste a faire |
 
-## Archive
+## Archives
 
-| Document | Role |
-|---|---|
-| [LIVE_AUDIT_2026-05-08.md](LIVE_AUDIT_2026-05-08.md) | Preuve historique du run/audit 2026-05-08, conservee comme archive non canonique |
-
-Les anciens audits dates strictement remplaces ne doivent pas redevenir docs principales. Si un futur audit apporte une preuve utile, garder un seul audit archive recent et reporter l'etat courant dans `CURRENT_STATUS.md`.
+Les anciens audits dates strictement remplaces ne sont plus gardes comme documents Markdown suivis: ils restent recuperables dans l'historique Git et les snapshots locaux sous `runs/history/`. Si un futur audit apporte une preuve utile, garder au maximum une archive recente, clairement marquee non canonique, et reporter l'etat courant dans `CURRENT_STATUS.md`.
 
 ## Regles De Maintenance
 
