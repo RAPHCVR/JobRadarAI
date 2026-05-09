@@ -5,10 +5,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$pod = kubectl get pod -n $Namespace -l app.kubernetes.io/name=jobradarai-web -o jsonpath="{.items[0].metadata.name}"
-if (-not $pod) {
-    throw "Pod jobradarai-web introuvable."
-}
+. (Join-Path $PSScriptRoot "lib_web_k8s.ps1")
+$pod = Get-JobRadarWebPod -Namespace $Namespace
 
 Push-Location $root
 try {
