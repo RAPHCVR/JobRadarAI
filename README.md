@@ -23,19 +23,19 @@ Le projet est volontairement local et humain-dans-la-boucle:
 
 ## Etat Court
 
-Dernier full run valide documente: **2026-05-09 16:43 Europe/Paris**.
+Dernier full run valide documente: **2026-05-09 19:59 Europe/Paris**.
 
-- 4815 offres retenues.
+- 4976 offres retenues.
 - 58 sources OK, 2 sources ignorees attendues, 0 erreur.
 - 532 missions VIE Business France.
 - 200 offres jugees par le LLM en mode `balanced`.
 - 236 liens verifies en mode priority-aware.
-- 176 items dans la queue multi-run dedupee.
+- 181 items dans la queue multi-run dedupee.
 - Tache Windows `JobRadarAI-Daily`: **desactivee**.
 
 Le full run inclut les extensions ajoutees pendant l'audit: Bundesagentur Jobsuche, SmartRecruiters durci, Delivery Hero filtre, correction du matching marche par alias bornes, JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS, Doctorat.gouv.fr, AcademicTransfer, WeWorkRemotely RSS, SwissDevJobs, GermanTechJobs, champs structures `deadline`/`language_check`/`remote_location_validity`/`required_years`/`experience_check`/salaire annualise EUR, extension graduate/early-career/doctorat industriel-CIFRE, et extension opportuniste Autriche/Nordics/Espagne/Portugal/Estonie/Pologne/Tchequie.
 
-Extension post-run validee par tests et smoke cible: les requetes couvrent aussi `ML Engineer`, `AI/ML Engineer`, `ML Ops Engineer`, `AI Research Engineer`, `LLM Research Engineer`, `LLM Application Engineer`, `Analytics Engineer`, et une veille niche `Applied Scientist`/interpretability/explainability/AI safety/knowledge graph/semantic web. L'impact volume/qualite est a mesurer au prochain full run.
+Extension titres validee par full run: les requetes couvrent aussi `ML Engineer`, `AI/ML Engineer`, `ML Ops Engineer`, `AI Research Engineer`, `LLM Research Engineer`, `LLM Application Engineer`, `Analytics Engineer`, et une veille niche `Applied Scientist`/interpretability/explainability/AI safety/knowledge graph/semantic web. Le premier run large confirme que ces ajouts remontent des roles pertinents sans explosion de bruit dans la queue.
 
 ## Lancer
 

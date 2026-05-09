@@ -15,19 +15,19 @@ Le projet suit ce modele. Il est utilisable en routine manuelle ou quotidienne d
 
 ## Etat Runtime Valide
 
-Dernier full run complet valide documente: **2026-05-09 16:43 Europe/Paris**.
+Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
 
-- 4815 offres retenues.
+- 4976 offres retenues.
 - 58 sources OK.
 - 2 skips attendus: Adzuna sans credentials, JobSpy API local injoignable.
 - 0 erreur source.
 - 532 VIE retenus.
 - 200 offres jugees par le LLM en `balanced`.
 - 236 liens verifies en mode priority-aware.
-- Snapshot: `runs/history/20260509-160240`.
+- Snapshot: `runs/history/20260509-192018`.
 - Registre multi-run: `runs/history/job_history.sqlite`.
-- Queue dedupee: `runs/latest/application_queue.md`, 176 items apres durcissement `too_senior`/signaux structures.
-- Historique: 2233 nouvelles offres, 3 revenues, 671 disparues marquees `stale`, 0 `expired`.
+- Queue dedupee: `runs/latest/application_queue.md`, 181 items apres durcissement `too_senior`/signaux structures.
+- Historique: 674 nouvelles offres, 1 revenue, 1184 absentes marquees `stale`, 0 `expired`.
 - P0: aucun blocage runtime detecte.
 
 ## Repos Et Systemes Audites
@@ -102,12 +102,12 @@ Dernier full run complet valide documente: **2026-05-09 16:43 Europe/Paris**.
 ## Reste A Faire
 
 - `P0`: aucun blocage runtime detecte sur le dernier run complet.
-- `P1`: verifier manuellement les 89 liens `browser_required` avant candidature, surtout Indeed/JobSpy et pages protegees/anti-bot.
+- `P1`: verifier manuellement les 91 liens `browser_required` avant candidature, surtout Indeed/JobSpy et pages protegees/anti-bot.
 - `P1`: verifier manuellement les 15 liens `needs_review/server_error` avant candidature.
 - `P1`: verifier manuellement salaire et remote quand l'offre ne publie pas l'information ou quand le LLM marque `unknown`/`weak`.
 - `P2`: confirmer avec RH les dates de demarrage `unknown`/`too_soon`; ne pas filtrer automatiquement sur ce signal.
 - `P2`: traiter `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux de tri et de verification; `too_senior` doit rester hors queue actionnable sauf override LLM junior/all-levels explicite.
-- `P2/P3`: surveiller au prochain run le bruit apporte par `Analytics Engineer` et `Applied Scientist`; garder seulement si les raisons de score restent data/AI/platform/research explicites.
+- `P2/P3`: surveiller sur les prochains runs le bruit apporte par `Analytics Engineer` et `Applied Scientist`; le premier full run post-extension est correct, mais ces titres doivent rester sous garde-fous niveau/experience.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
 - `P3`: demarrer `rainmanjam/jobspy-api` en Docker seulement si tu veux une API JobSpy permanente au lieu du mode uv direct; le mode direct est maintenant timeout-borne.
 - `P3`: DevITJobs-like/Wellfound/ABG/Campus France Doctorat/DAAD restent des tests ponctuels possibles, mais ne sont pas prioritaires apres l'ajout EURAXESS + Doctorat.gouv.fr + AcademicTransfer + RSS tech.

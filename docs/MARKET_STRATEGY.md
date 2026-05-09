@@ -126,28 +126,28 @@
 
 ## Audit Dernier Run
 
-Run valide du 2026-05-09 16:43 Europe/Paris:
+Run valide du 2026-05-09 19:59 Europe/Paris:
 
-- France: 822 offres, meilleur fit langue/visa/proximite.
-- Allemagne: 655 offres, gros volume a filtrer par langue.
-- UK: 579 offres, marche AI/data fort mais visa hors UE.
+- France: 847 offres, meilleur fit langue/visa/proximite.
+- Allemagne: 706 offres, gros volume a filtrer par langue.
+- UK: 586 offres, marche AI/data fort mais visa hors UE.
 - Irlande: 345 offres, cible anglophone UE prioritaire.
-- Belgique: 303 offres, bon fit FR/EN/UE, renforce via Forem et Actiris.
-- Remote Europe: 297 offres.
-- Espagne: 292 offres, opportuniste si salaire/fit solides.
-- Singapour: 260 offres, marche AI anglophone mais relocation/visa.
-- Pays-Bas: 229 offres.
-- Suede: 218 offres.
+- Remote Europe: 295 offres.
+- Espagne: 291 offres, opportuniste si salaire/fit solides.
+- Belgique: 291 offres, bon fit FR/EN/UE, renforce via Forem et Actiris.
+- Singapour: 264 offres, marche AI anglophone mais relocation/visa.
+- Suede: 260 offres.
+- Pays-Bas: 246 offres.
 - Suisse: 207 offres, premium salaire mais marche selectif/permis a verifier.
-- Pologne: 111 offres.
-- Norvege: 105 offres.
+- Norvege: 135 offres.
+- Pologne: 112 offres.
 - Portugal: 104 offres.
 - Autriche: 100 offres.
-- Danemark: 72 offres.
+- Danemark: 71 offres.
 - Tchequie: 50 offres.
 - Finlande: 32 offres.
 - Luxembourg: 32 offres.
 - Estonie: 2 offres.
-- Remote/hybride detecte: 2057 offres.
-- Salaire publie hors VIE: 507 offres, dont 452 >= 45k EUR.
+- Remote/hybride detecte: 2089 offres.
+- Salaire publie hors VIE: 521 offres, dont 466 >= 45k EUR.
 - VIE Business France: 532 missions retenues, indemnite mensuelle observee de 2610 a 4427 EUR.
