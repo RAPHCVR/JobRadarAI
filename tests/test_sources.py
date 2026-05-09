@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import unittest
+from pathlib import Path
 
 from jobradai.http import HttpClient, HttpError
 from jobradai.redaction import redact_url
 from jobradai.sources.ats import _ashby_location, _extract_location, _http_for_feed, fetch_ats_feed
-from jobradai.sources.optional import _france_travail_terms, _jobspy_timeout_seconds
+from jobradai.sources.optional import _france_travail_terms, _jobspy_timeout_seconds, _run_text_command
 from jobradai.sources.public import (
     fetch_actiris,
     fetch_academictransfer,
@@ -796,6 +799,25 @@ class SourceHelpersTests(unittest.TestCase):
         self.assertEqual(_jobspy_timeout_seconds({"timeout_seconds": 5}), 30)
         self.assertEqual(_jobspy_timeout_seconds({"timeout_seconds": 1200}), 900)
         self.assertEqual(_jobspy_timeout_seconds({"timeout_seconds": 90}), 90)
+
+    def test_run_text_command_captures_output_without_stdout_pipe(self) -> None:
+        completed = _run_text_command(
+            [sys.executable, "-c", "import sys; print(sys.stdin.read().upper())"],
+            input_text="ok",
+            cwd=Path.cwd(),
+            timeout_seconds=10,
+        )
+        self.assertEqual(completed.returncode, 0)
+        self.assertEqual(completed.stdout.strip(), "OK")
+
+    def test_run_text_command_timeout_returns_control(self) -> None:
+        with self.assertRaises(subprocess.TimeoutExpired):
+            _run_text_command(
+                [sys.executable, "-c", "import time; time.sleep(5)"],
+                input_text="",
+                cwd=Path.cwd(),
+                timeout_seconds=1,
+            )
 
     def test_http_error_redacts_env_secret(self) -> None:
         os.environ["JOBRADAR_TEST_API_KEY"] = "super-secret-token"

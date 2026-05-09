@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -297,28 +298,57 @@ def _run_text_command(
     cwd: Path,
     timeout_seconds: int,
 ) -> subprocess.CompletedProcess[str]:
-    process = subprocess.Popen(
-        command,
-        cwd=cwd,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    try:
-        stdout, stderr = process.communicate(input=input_text, timeout=timeout_seconds)
-    except subprocess.TimeoutExpired as exc:
-        _terminate_process_tree(process.pid)
-        try:
-            stdout, stderr = process.communicate(timeout=5)
-        except subprocess.TimeoutExpired:
-            stdout, stderr = "", ""
-        exc.output = stdout
-        exc.stderr = stderr
-        raise
-    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    with tempfile.TemporaryDirectory(prefix="jobradai-jobspy-") as temp_dir:
+        stdout_path = Path(temp_dir) / "stdout.txt"
+        stderr_path = Path(temp_dir) / "stderr.txt"
+        with stdout_path.open("w", encoding="utf-8", errors="replace") as stdout_file, stderr_path.open(
+            "w", encoding="utf-8", errors="replace"
+        ) as stderr_file:
+            process = subprocess.Popen(
+                command,
+                cwd=cwd,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                stdin=subprocess.PIPE,
+                stdout=stdout_file,
+                stderr=stderr_file,
+            )
+            try:
+                if process.stdin:
+                    try:
+                        process.stdin.write(input_text)
+                    except BrokenPipeError:
+                        pass
+                    finally:
+                        with contextlib.suppress(Exception):
+                            process.stdin.close()
+                returncode = process.wait(timeout=timeout_seconds)
+            except subprocess.TimeoutExpired as exc:
+                _terminate_process_tree(process.pid)
+                with contextlib.suppress(Exception):
+                    process.kill()
+                with contextlib.suppress(Exception):
+                    process.wait(timeout=5)
+                stdout_file.flush()
+                stderr_file.flush()
+                exc.output = _read_text_file(stdout_path)
+                exc.stderr = _read_text_file(stderr_path)
+                raise
+            stdout_file.flush()
+            stderr_file.flush()
+        return subprocess.CompletedProcess(
+            command,
+            returncode,
+            _read_text_file(stdout_path),
+            _read_text_file(stderr_path),
+        )
+
+
+def _read_text_file(path: Path) -> str:
+    if not path.exists():
+        return ""
+    return path.read_text(encoding="utf-8", errors="replace")
 
 
 def _terminate_process_tree(pid: int) -> None:
