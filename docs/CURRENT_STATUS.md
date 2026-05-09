@@ -2,7 +2,7 @@
 
 Derniere validation run: **2026-05-09 19:59 Europe/Paris**, full run large manuel `20260509-192018` apres audit, nettoyage, durcissement JobSpy Direct, extension sources/geographies, extension titres et garde-fous experience.
 
-Derniere validation plateforme web: **2026-05-09 23:03 Europe/Paris**, deployee sur Kubernetes sous `https://jobs.raphcvr.me`.
+Derniere validation plateforme web: **2026-05-09 23:40 Europe/Paris**, interface UI/UX amelioree, deployee sur Kubernetes sous `https://jobs.raphcvr.me`.
 
 Commande utilisee pour la base large:
 
@@ -34,8 +34,8 @@ Commande utilisee pour la base large:
 - Registre multi-run: `runs/history/job_history.sqlite`.
 - Logs: `runs/logs/`.
 - Tache Windows: `JobRadarAI-Daily` **desactivee**. Aucun run automatique ne doit partir tant que la tache reste `Disabled`.
-- Plateforme web: pod `jobradarai-web` **Running 1/1**, ingress `jobs.raphcvr.me`, PVC Longhorn `jobradarai-data` 5Gi, auth active.
-- Smoke web HTTPS: `/api/health` OK, login OK, `run_name=20260509-192018`, `queue_count=181`, CV PDF disponible.
+- Plateforme web: pod `jobradarai-web` **Running 1/1**, image `ghcr.io/raphcvr/jobradarai-web:sha-e7ad16a`, ingress `jobs.raphcvr.me`, PVC Longhorn `jobradarai-data` 5Gi, auth active.
+- Smoke web HTTPS: `/api/health` OK, login OK, `run_name=20260509-192018`, `queue_count=181`, CV PDF disponible, rendu desktop/mobile OK sans overflow horizontal.
 
 Exports principaux:
 
@@ -196,6 +196,7 @@ Verdict: la couche marche et reste correctement secondaire. Elle capture les gra
 - Workspace nettoye puis pousse sur GitHub.
 - Interface web React/Vite + shadcn-style ajoutee, dockerisee, publiee via GHCR, deployee sur Kubernetes et synchronisee avec `runs/latest`.
 - Durcissement web ajoute: rate-limit login, garde `Origin` sur mutations API, headers HSTS/permissions/COOP.
+- Passe UI/UX web ajoutee: grille responsive lisible desktop/mobile, etats vides, tri radar/score/dernieres notes, feedback sauvegarde/copie, champs URL candidature/contact, dernier contact et variante CV.
 - CV PDF genere localement apres installation des paquets TinyTeX manquants (`babel-french`, `fontawesome5`) puis monte dans le PVC web.
 - Secret web initial cree dans Kubernetes; copie locale ignoree par Git dans `runs/state/web_initial_credentials.txt`.
 
