@@ -5,12 +5,13 @@ import os
 import subprocess
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from jobradai.http import HttpClient, HttpError
 from jobradai.redaction import redact_url
 from jobradai.sources.ats import _ashby_location, _extract_location, _http_for_feed, fetch_ats_feed
-from jobradai.sources.optional import _france_travail_terms, _jobspy_timeout_seconds, _run_text_command
+from jobradai.sources.optional import fetch_france_travail, _france_travail_terms, _jobspy_timeout_seconds, _run_text_command
 from jobradai.sources.public import (
     fetch_actiris,
     fetch_academictransfer,
@@ -34,6 +35,37 @@ class RateLimitedHttp:
         raise HttpError("HTTP failure for https://jobicy.com/api/v2/remote-jobs: HTTP 429 rate limited")
 
 
+class JobicyFallbackHttp:
+    def __init__(self) -> None:
+        self.params: list[dict] = []
+
+    def fetch_json(self, url, params=None, **kwargs):
+        self.params.append(params or {})
+        if (params or {}).get("tag"):
+            return {"jobs": []}
+        return {
+            "jobs": [
+                {
+                    "id": 1,
+                    "jobTitle": "Systems Research Engineer - Software Engineer, Data and ML Infrastructure",
+                    "companyName": "Acme AI",
+                    "url": "https://jobicy.com/jobs/1",
+                    "jobGeo": "Remote Europe",
+                    "jobDescription": "Build data and ML infrastructure for research systems.",
+                    "jobIndustry": ["Engineering"],
+                    "jobType": "Full-time",
+                },
+                {
+                    "id": 2,
+                    "jobTitle": "PPC Specialist",
+                    "companyName": "Marketing Co",
+                    "url": "https://jobicy.com/jobs/2",
+                    "jobDescription": "Paid campaigns and SEO.",
+                },
+            ]
+        }
+
+
 class TextHttp:
     def __init__(self, text: str):
         self.text = text
@@ -42,6 +74,56 @@ class TextHttp:
     def fetch_text(self, url: str, *args, **kwargs) -> str:
         self.urls.append(url)
         return self.text
+
+
+class FranceTravailHttp:
+    def __init__(self) -> None:
+        self.ranges: list[str] = []
+
+    def fetch_json(self, *args, **kwargs):
+        return {"access_token": "token"}
+
+    def fetch_text(self, url, params=None, **kwargs):
+        current_range = (params or {}).get("range", "")
+        self.ranges.append(current_range)
+        rows_by_range = {
+            "0-1": [
+                {
+                    "id": "a",
+                    "intitule": "Data Engineer",
+                    "entreprise": {"nom": "Acme"},
+                    "lieuTravail": {"libelle": "Paris"},
+                    "origineOffre": {"urlOrigine": "https://example.com/a"},
+                    "description": "Python SQL data platform.",
+                },
+                {
+                    "id": "b",
+                    "intitule": "ML Engineer",
+                    "entreprise": {"nom": "Beta"},
+                    "lieuTravail": {"libelle": "Lyon"},
+                    "origineOffre": {"urlOrigine": "https://example.com/b"},
+                    "description": "Machine learning production.",
+                },
+            ],
+            "2-3": [
+                {
+                    "id": "b",
+                    "intitule": "ML Engineer duplicate",
+                    "entreprise": {"nom": "Beta"},
+                    "lieuTravail": {"libelle": "Lyon"},
+                    "origineOffre": {"urlOrigine": "https://example.com/b"},
+                },
+                {
+                    "id": "c",
+                    "intitule": "Analytics Engineer",
+                    "entreprise": {"nom": "Gamma"},
+                    "lieuTravail": {"libelle": "Nantes"},
+                    "origineOffre": {"urlOrigine": "https://example.com/c"},
+                    "description": "dbt warehouse analytics.",
+                },
+            ],
+        }
+        return json.dumps({"resultats": rows_by_range.get(current_range, [])})
 
 
 class DoctoratGouvHttp:
@@ -530,6 +612,17 @@ class SourceHelpersTests(unittest.TestCase):
         jobs = fetch_jobicy({"queries": [{"term": "AI Engineer"}]}, RateLimitedHttp())
         self.assertEqual(jobs, [])
 
+    def test_jobicy_falls_back_to_global_feed_with_local_filter(self) -> None:
+        http = JobicyFallbackHttp()
+        jobs = fetch_jobicy(
+            {"queries": [{"term": "Data Engineer"}], "jobicy": {"fallback_count": 2}},
+            http,
+        )
+        self.assertEqual(len(jobs), 1)
+        self.assertIn("Data and ML Infrastructure", jobs[0].title)
+        self.assertEqual(jobs[0].company, "Acme AI")
+        self.assertTrue(any("tag" not in params for params in http.params))
+
     def test_business_france_vie_maps_official_offer(self) -> None:
         jobs = fetch_business_france_vie({"business_france_vie": {"queries": ["data"], "max_queries": 1}}, BusinessFranceHttp())
         self.assertEqual(len(jobs), 1)
@@ -584,6 +677,22 @@ class SourceHelpersTests(unittest.TestCase):
         self.assertEqual(swiss[0].salary, "CHF 80'000 - 110'000")
         self.assertEqual(swiss[0].country, "Switzerland")
         self.assertEqual(german[0].country, "Germany")
+
+    def test_german_tech_rss_can_scan_beyond_1000_items_when_configured(self) -> None:
+        items = [
+            f"<item><title>Marketing Lead @ Noise {index}</title><link>https://example.com/noise-{index}</link><description>Sales.</description></item>"
+            for index in range(1100)
+        ]
+        items.append(
+            "<item><title>AI Engineer @ Late AG</title><link>https://example.com/late-ai</link><description>LLM, Python and MLOps.</description></item>"
+        )
+        rss = "<?xml version=\"1.0\"?><rss><channel>" + "".join(items) + "</channel></rss>"
+        config = {"queries": [{"term": "Data Engineer"}], "germantechjobs": {"feed": "https://example.com/rss"}}
+        limited = fetch_germantechjobs({**config, "germantechjobs": {"feed": "https://example.com/rss", "max_items": 1000}}, TextHttp(rss))
+        widened = fetch_germantechjobs({**config, "germantechjobs": {"feed": "https://example.com/rss", "max_items": 1200}}, TextHttp(rss))
+        self.assertEqual(limited, [])
+        self.assertEqual(len(widened), 1)
+        self.assertEqual(widened[0].title, "AI Engineer")
 
     def test_euraxess_extracts_deadline_from_official_portal_html(self) -> None:
         html = """
@@ -675,6 +784,17 @@ class SourceHelpersTests(unittest.TestCase):
         self.assertIn("StepStone", jobs[0].tags)
         self.assertEqual(http.params[0]["where"], '"data engineer"')
 
+    def test_forem_can_prepend_source_specific_queries(self) -> None:
+        http = ForemHttp()
+        fetch_forem(
+            {
+                "forem": {"max_queries": 1, "queries": ["Data Quality Analyst"]},
+                "queries": [{"term": "data engineer"}],
+            },
+            http,
+        )
+        self.assertEqual(http.params[0]["where"], '"Data Quality Analyst"')
+
     def test_actiris_maps_public_offer_and_pages(self) -> None:
         http = ActirisHttp()
         jobs = fetch_actiris(
@@ -688,6 +808,17 @@ class SourceHelpersTests(unittest.TestCase):
         self.assertEqual(jobs[0].company, "SMALS - MVM")
         self.assertIn("reference=5836063", jobs[0].url)
         self.assertEqual(http.bodies[0]["pageOption"], {"page": 1, "pageSize": 5})
+
+    def test_actiris_can_prepend_source_specific_queries(self) -> None:
+        http = ActirisHttp()
+        fetch_actiris(
+            {
+                "actiris": {"max_queries": 1, "page_size": 5, "max_pages": 1, "queries": ["Data Quality Analyst"]},
+                "queries": [{"term": "data engineer"}],
+            },
+            http,
+        )
+        self.assertEqual(http.bodies[0]["offreFilter"], {"texte": "Data Quality Analyst"})
 
     def test_bundesagentur_maps_official_jobs_and_uses_public_key(self) -> None:
         http = BundesagenturHttp()
@@ -787,12 +918,30 @@ class SourceHelpersTests(unittest.TestCase):
                     {"term": "Graduate Data Engineer", "priority": 8, "category": "early_career"},
                 ]
             },
-            max_queries=9,
+            max_queries=12,
         )
         self.assertIn("architecte data", terms)
+        self.assertIn("data scientist", terms)
         self.assertIn("LLM", terms)
         self.assertIn("RAG", terms)
         self.assertEqual(len(terms), len({term.casefold() for term in terms}))
+
+    def test_france_travail_paginates_and_deduplicates_search_results(self) -> None:
+        http = FranceTravailHttp()
+        with mock.patch.dict(
+            os.environ,
+            {"FRANCE_TRAVAIL_CLIENT_ID": "client", "FRANCE_TRAVAIL_CLIENT_SECRET": "secret"},
+        ):
+            jobs, reason = fetch_france_travail(
+                {
+                    "queries": [{"term": "Data Engineer"}],
+                    "france_travail": {"max_queries": 1, "page_size": 2, "max_pages": 3},
+                },
+                http,
+            )
+        self.assertEqual(reason, "")
+        self.assertEqual(http.ranges, ["0-1", "2-3", "4-5"])
+        self.assertEqual([job.raw_id for job in jobs], ["a", "b", "c"])
 
     def test_jobspy_direct_timeout_is_bounded_and_configurable(self) -> None:
         self.assertEqual(_jobspy_timeout_seconds({}), 240)

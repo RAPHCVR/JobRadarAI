@@ -11,7 +11,14 @@ from jobradai.exporters import export_all
 from jobradai.graduate import write_graduate_digest
 from jobradai.history import sync_history
 from jobradai.link_check import verify_links
-from jobradai.llm_judge import LLMJudgeError, LLMSettings, judge_jobs
+from jobradai.llm_judge import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_CONCURRENCY,
+    DEFAULT_MAX_FALLBACK_RATIO,
+    LLMJudgeError,
+    LLMSettings,
+    judge_jobs,
+)
 from jobradai.pipeline import run_pipeline
 from jobradai.snapshot import write_snapshot
 from jobradai.webapp import run_web_app
@@ -37,12 +44,15 @@ def main(argv: list[str] | None = None) -> int:
     judge.add_argument("--input", type=Path, default=None)
     judge.add_argument("--output", type=Path, default=None)
     judge.add_argument("--limit", type=int, default=30)
-    judge.add_argument("--batch-size", type=int, default=5)
-    judge.add_argument("--selection-mode", choices=["top", "balanced", "vie", "all"], default="balanced")
+    judge.add_argument("--batch-size", type=int, default=DEFAULT_BATCH_SIZE)
+    judge.add_argument("--concurrency", type=int, default=DEFAULT_CONCURRENCY)
+    judge.add_argument("--selection-mode", choices=["top", "balanced", "wide", "vie", "all"], default="wide")
     judge.add_argument("--base-url", default=None)
     judge.add_argument("--model", default=None)
     judge.add_argument("--effort", choices=["none", "minimal", "low", "medium", "high", "xhigh"], default=None)
+    judge.add_argument("--transport", choices=["auto", "sdk", "raw"], default=None)
     judge.add_argument("--timeout", type=int, default=None)
+    judge.add_argument("--max-fallback-ratio", type=float, default=DEFAULT_MAX_FALLBACK_RATIO)
     judge.add_argument("--dry-run", action="store_true")
 
     links = sub.add_parser("verify-links", help="Verifie les liens/apply du corpus exporte.")
@@ -115,6 +125,7 @@ def main(argv: list[str] | None = None) -> int:
                 model=args.model,
                 reasoning_effort=args.effort,
                 timeout_seconds=args.timeout,
+                transport=args.transport,
             )
         try:
             result = judge_jobs(
@@ -123,19 +134,27 @@ def main(argv: list[str] | None = None) -> int:
                 profile=config.profile,
                 limit=args.limit,
                 batch_size=args.batch_size,
+                concurrency=args.concurrency,
                 selection_mode=args.selection_mode,
                 settings=settings,
                 dry_run=args.dry_run,
                 progress=not args.dry_run,
+                max_fallback_ratio=args.max_fallback_ratio,
             )
         except LLMJudgeError as exc:
             print(f"erreur_llm={exc}", file=sys.stderr)
             return 1
         if args.dry_run:
-            print(f"dry_run=1 offres={len(result['jobs'])} output={output / 'llm_payload_preview.json'}")
+            print(
+                f"dry_run=1 offres={len(result['jobs'])} concurrency={result.get('concurrency', 1)} "
+                f"output={output / 'llm_payload_preview.json'}"
+            )
         else:
             print(f"offres_judgees={result['count']} output={output}")
             print(f"batches={len(result.get('batches', []))}")
+            print(f"concurrency={result.get('concurrency', 1)}")
+            print(f"transport={result.get('transport', '')} endpoint={result.get('endpoint', '')}")
+            print(f"fallback={result.get('fallback_items', 0)}/{result.get('count', 0)} ratio={result.get('fallback_ratio', 0):.3f}")
             print(f"shortlist={output / 'llm_shortlist.md'}")
             print(f"json={output / 'llm_shortlist.json'}")
         return 0

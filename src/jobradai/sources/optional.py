@@ -385,35 +385,53 @@ def fetch_france_travail(config: dict[str, Any], http: HttpClient) -> tuple[list
     jobs: list[Job] = []
     settings = dict(config.get("france_travail", {}))
     terms = _france_travail_terms(config, max_queries=int(settings.get("max_queries", 22) or 22))
+    page_size = max(1, min(int(settings.get("page_size", 50) or 50), 50))
+    max_pages = max(1, min(int(settings.get("max_pages", 3) or 3), 5))
+    seen: set[str] = set()
     for term in terms:
-        text = http.fetch_text(
-            "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search",
-            {"motsCles": term, "range": "0-49", "sort": 1},
-            headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
-        )
-        if not text.strip():
-            continue
-        data = json.loads(text)
-        for item in data.get("resultats", []):
-            company = item.get("entreprise") or {}
-            place = item.get("lieuTravail") or {}
-            jobs.append(
-                Job(
-                    source="France Travail",
-                    source_type="official_api",
-                    title=normalize_space(item.get("intitule")),
-                    company=normalize_space(company.get("nom")),
-                    url=item.get("origineOffre", {}).get("urlOrigine") or "",
-                    apply_url=item.get("contact", {}).get("urlPostulation") or item.get("origineOffre", {}).get("urlOrigine") or "",
-                    location=normalize_space(place.get("libelle")),
-                    country="France",
-                    description=clean_html(item.get("description")),
-                    posted_at=item.get("dateCreation") or "",
-                    salary=normalize_space((item.get("salaire") or {}).get("libelle")),
-                    employment_type=normalize_space((item.get("typeContrat") or "")),
-                    raw_id=str(item.get("id") or ""),
-                )
+        for page in range(max_pages):
+            start = page * page_size
+            end = start + page_size - 1
+            text = http.fetch_text(
+                "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search",
+                {"motsCles": term, "range": f"{start}-{end}", "sort": 1},
+                headers={"Authorization": f"Bearer {access_token}", "Accept": "application/json"},
             )
+            if not text.strip():
+                break
+            data = json.loads(text)
+            rows = data.get("resultats", [])
+            if not rows:
+                break
+            for item in rows:
+                raw_id = str(item.get("id") or "").strip()
+                if raw_id and raw_id in seen:
+                    continue
+                if raw_id:
+                    seen.add(raw_id)
+                company = item.get("entreprise") or {}
+                place = item.get("lieuTravail") or {}
+                jobs.append(
+                    Job(
+                        source="France Travail",
+                        source_type="official_api",
+                        title=normalize_space(item.get("intitule")),
+                        company=normalize_space(company.get("nom")),
+                        url=item.get("origineOffre", {}).get("urlOrigine") or "",
+                        apply_url=item.get("contact", {}).get("urlPostulation")
+                        or item.get("origineOffre", {}).get("urlOrigine")
+                        or "",
+                        location=normalize_space(place.get("libelle")),
+                        country="France",
+                        description=clean_html(item.get("description")),
+                        posted_at=item.get("dateCreation") or "",
+                        salary=normalize_space((item.get("salaire") or {}).get("libelle")),
+                        employment_type=normalize_space((item.get("typeContrat") or "")),
+                        raw_id=raw_id,
+                    )
+                )
+            if len(rows) < page_size:
+                break
     return jobs, ""
 
 
@@ -430,8 +448,13 @@ def _france_travail_terms(config: dict[str, Any], *, max_queries: int = 22) -> l
             "RAG",
             "ingénieur machine learning",
             "ingénieur ML",
+            "data scientist",
+            "data analyst",
             "ML engineer",
             "analytics engineer",
+            "master data",
+            "data management",
+            "traitement des données",
             "ingénieur recherche IA",
             "applied scientist",
             "interpretability",

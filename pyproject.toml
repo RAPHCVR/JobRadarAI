@@ -10,11 +10,12 @@ readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Raphael" }]
 license = { text = "Private" }
-dependencies = []
+dependencies = [
+    "openai>=2.0.0",
+]
 
 [project.scripts]
 jobradai = "jobradai.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-

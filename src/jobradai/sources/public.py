@@ -679,7 +679,7 @@ def _rss_jobs(
 ) -> list[Job]:
     jobs: list[Job] = []
     seen: set[str] = set()
-    per_feed = max(1, min(max_items, 1000))
+    per_feed = max(1, min(max_items, 1500))
     for feed in feeds:
         if not feed:
             continue
@@ -877,7 +877,7 @@ def fetch_forem(config: dict[str, Any], http: HttpClient) -> list[Job]:
     results_per_query = int(settings.get("results_per_query", 60) or 60)
     jobs: list[Job] = []
     seen: set[str] = set()
-    for term in query_terms(config, limit=max_queries, early_career_min=3):
+    for term in _source_query_terms(config, "forem", limit=max_queries, early_career_min=3):
         data = http.fetch_json(
             endpoint,
             {
@@ -939,7 +939,7 @@ def fetch_actiris(config: dict[str, Any], http: HttpClient) -> list[Job]:
     max_pages = max(1, min(int(settings.get("max_pages", 2) or 2), 5))
     jobs: list[Job] = []
     seen: set[str] = set()
-    for term in query_terms(config, limit=max_queries, early_career_min=3):
+    for term in _source_query_terms(config, "actiris", limit=max_queries, early_career_min=3):
         for page in range(1, max_pages + 1):
             body = json.dumps(
                 {
@@ -970,6 +970,27 @@ def fetch_actiris(config: dict[str, Any], http: HttpClient) -> list[Job]:
             if len(rows) < page_size:
                 break
     return jobs
+
+
+def _source_query_terms(config: dict[str, Any], source_key: str, *, limit: int, early_career_min: int = 0) -> list[str]:
+    configured = [
+        normalize_space(str(term))
+        for term in config.get(source_key, {}).get("queries", [])
+        if normalize_space(str(term))
+    ]
+    if not configured:
+        return query_terms(config, limit=limit, early_career_min=early_career_min)
+    output: list[str] = []
+    seen: set[str] = set()
+    for term in [*configured, *query_terms(config, limit=limit, early_career_min=early_career_min)]:
+        key = term.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        output.append(term)
+        if len(output) >= limit:
+            break
+    return output
 
 
 def _actiris_job(item: dict[str, Any]) -> Job:
@@ -1454,8 +1475,24 @@ def fetch_remoteok(config: dict[str, Any], http: HttpClient) -> list[Job]:
 
 
 def fetch_jobicy(config: dict[str, Any], http: HttpClient) -> list[Job]:
+    settings = config.get("jobicy", {})
+    fallback_count = max(1, min(int(settings.get("fallback_count", 80) or 80), 100))
+    tag_query_limit = max(0, min(int(settings.get("tag_query_limit", 8) or 8), 20))
+    terms = query_terms(config, limit=20, early_career_min=5)
     jobs: list[Job] = []
-    for term in query_terms(config, limit=20, early_career_min=5):
+    seen: set[str] = set()
+    try:
+        data = http.fetch_json("https://jobicy.com/api/v2/remote-jobs", {"count": fallback_count})
+    except HttpError as exc:
+        if "HTTP 429" not in str(exc):
+            raise
+    else:
+        for item in data.get("jobs", []):
+            if _jobicy_global_match(item):
+                _append_jobicy_job(jobs, seen, item)
+    if jobs:
+        return jobs
+    for term in terms[:tag_query_limit]:
         tag = term.lower().replace(" ", "-").replace("/", "-")
         try:
             data = http.fetch_json("https://jobicy.com/api/v2/remote-jobs", {"count": 50, "tag": tag})
@@ -1464,25 +1501,80 @@ def fetch_jobicy(config: dict[str, Any], http: HttpClient) -> list[Job]:
                 continue
             raise
         for item in data.get("jobs", []):
-            jobs.append(
-                Job(
-                    source="Jobicy",
-                    source_type="public_api",
-                    title=normalize_space(item.get("jobTitle")),
-                    company=normalize_space(item.get("companyName")),
-                    url=item.get("url", ""),
-                    apply_url=item.get("url", ""),
-                    location=normalize_space(item.get("jobGeo") or "Remote"),
-                    remote=True,
-                    description=clean_html(item.get("jobDescription")),
-                    posted_at=item.get("pubDate") or "",
-                    employment_type=normalize_space(item.get("jobType")),
-                    salary=normalize_space(item.get("annualSalaryMin") or ""),
-                    tags=[normalize_space(t) for t in item.get("jobIndustry") or []],
-                    raw_id=str(item.get("id") or ""),
-                )
-            )
+            _append_jobicy_job(jobs, seen, item)
     return jobs
+
+
+def _jobicy_global_match(item: dict[str, Any]) -> bool:
+    title = _strip_accents(normalize_space(item.get("jobTitle"))).lower()
+    industry = _strip_accents(
+        normalize_space(
+            " ".join(item.get("jobIndustry") or []) if isinstance(item.get("jobIndustry"), list) else item.get("jobIndustry")
+        )
+    ).lower()
+    role_blob = text_blob(title, industry)
+    if any(term in title for term in ("chief of staff", "account executive", "marketing", "sales", "customer success", "ppc")):
+        return False
+    strong_phrases = {
+        "ai engineer",
+        "ai scientist",
+        "ai platform",
+        "ai research",
+        "analytics engineer",
+        "applied ai",
+        "data analyst",
+        "data engineer",
+        "data engineering",
+        "data platform",
+        "data science",
+        "data scientist",
+        "genai",
+        "knowledge graph",
+        "llm",
+        "machine learning",
+        "ml engineer",
+        "ml infrastructure",
+        "mlops",
+        "research engineer",
+        "semantic web",
+    }
+    if any(term in role_blob for term in strong_phrases):
+        return True
+    title_tokens = set(_word_tokens(title))
+    if title_tokens.intersection({"engineer", "scientist", "researcher"}) and title_tokens.intersection(
+        {"ai", "data", "llm", "ml", "machine", "learning"}
+    ):
+        return True
+    return bool(
+        ("data science" in industry or "analytics" in industry)
+        and title_tokens.intersection({"analyst", "analytics", "engineer", "scientist", "specialist"})
+    )
+
+
+def _append_jobicy_job(jobs: list[Job], seen: set[str], item: dict[str, Any]) -> None:
+    raw_id = str(item.get("id") or item.get("url") or "").strip()
+    if raw_id and raw_id in seen:
+        return
+    if raw_id:
+        seen.add(raw_id)
+    jobs.append(
+        Job(
+            source="Jobicy",
+            source_type="public_api",
+            title=normalize_space(item.get("jobTitle")),
+            company=normalize_space(item.get("companyName")),
+            url=item.get("url", ""),
+            apply_url=item.get("url", ""),
+            location=normalize_space(item.get("jobGeo") or "Remote"),
+            remote=True,
+            description=clean_html(item.get("jobDescription")),
+            posted_at=item.get("pubDate") or "",
+            employment_type=_flat_text(item.get("jobType")),
+            salary=_flat_text(item.get("annualSalaryMin")),
+            tags=[normalize_space(t) for t in item.get("jobIndustry") or []],
+            raw_id=raw_id,
+        )
+    )
 
 
 def fetch_himalayas(config: dict[str, Any], http: HttpClient) -> list[Job]:

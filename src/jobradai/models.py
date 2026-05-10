@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import hashlib
+import re
+import urllib.parse
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -48,7 +50,7 @@ class Job:
                 self.source.lower().strip(),
                 self.company.lower().strip(),
                 self.title.lower().strip(),
-                self.url.lower().strip(),
+                _stable_url(self.url),
             ]
         )
         return hashlib.sha256(base.encode("utf-8")).hexdigest()[:24]
@@ -66,3 +68,16 @@ class SourceRun:
     count: int = 0
     skipped: bool = False
     reason: str = ""
+
+
+def _stable_url(url: str) -> str:
+    value = url.lower().strip()
+    if not value:
+        return ""
+    parsed = urllib.parse.urlsplit(value)
+    host = parsed.netloc.lower()
+    if host.endswith("jooble.org") or host.endswith("jooble.com"):
+        desc_match = re.search(r"/desc/[^/?#]+", parsed.path)
+        path = desc_match.group(0) if desc_match else parsed.path.rstrip("/")
+        return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+    return value

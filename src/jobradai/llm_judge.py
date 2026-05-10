@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import concurrent.futures
+import importlib.util
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -17,11 +20,20 @@ from jobradai.text import clean_html, normalize_space
 
 DEFAULT_BASE_URL = "https://codex.raphcvr.me/v1"
 DEFAULT_MODEL = "gpt-5.4-mini"
-DEFAULT_REASONING_EFFORT = "high"
-DEFAULT_SELECTION_MODE = "balanced"
+DEFAULT_REASONING_EFFORT = "medium"
+DEFAULT_SELECTION_MODE = "wide"
 DEFAULT_TIMEOUT_SECONDS = 360
+DEFAULT_CONCURRENCY = 1
+DEFAULT_BATCH_SIZE = 10
+DEFAULT_TRANSPORT = "auto"
+LOCAL_SCORE_WEIGHT = 0.40
+LLM_SCORE_WEIGHT = 0.60
+LLM_BATCH_MAX_ATTEMPTS = 3
+LLM_BATCH_RETRY_SECONDS = 45
+DEFAULT_MAX_FALLBACK_RATIO = 0.01
 VALID_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
-VALID_SELECTION_MODES = {"top", "balanced", "vie", "all"}
+VALID_TRANSPORTS = {"auto", "sdk", "raw"}
+VALID_SELECTION_MODES = {"top", "balanced", "wide", "vie", "all"}
 VALID_PRIORITIES = {"apply_now", "shortlist", "maybe", "skip"}
 VALID_LEVEL_FITS = {"junior_ok", "stretch", "too_senior", "too_junior", "unknown"}
 VALID_SALARY_CHECKS = {"meets_or_likely", "unknown", "below_min"}
@@ -54,6 +66,7 @@ class LLMSettings:
     model: str = DEFAULT_MODEL
     reasoning_effort: str = DEFAULT_REASONING_EFFORT
     timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS
+    transport: str = DEFAULT_TRANSPORT
 
     @classmethod
     def from_env(
@@ -63,6 +76,7 @@ class LLMSettings:
         model: str | None = None,
         reasoning_effort: str | None = None,
         timeout_seconds: int | None = None,
+        transport: str | None = None,
     ) -> "LLMSettings":
         effort = reasoning_effort or os.environ.get("JOBRADAR_LLM_REASONING_EFFORT") or DEFAULT_REASONING_EFFORT
         effort = effort.lower().strip()
@@ -70,6 +84,12 @@ class LLMSettings:
             raise LLMJudgeError(
                 "JOBRADAR_LLM_REASONING_EFFORT invalide. "
                 f"Valeurs supportees: {', '.join(sorted(VALID_EFFORTS))}."
+            )
+        selected_transport = (transport or os.environ.get("JOBRADAR_LLM_TRANSPORT") or DEFAULT_TRANSPORT).lower().strip()
+        if selected_transport not in VALID_TRANSPORTS:
+            raise LLMJudgeError(
+                "JOBRADAR_LLM_TRANSPORT invalide. "
+                f"Valeurs supportees: {', '.join(sorted(VALID_TRANSPORTS))}."
             )
         return cls(
             base_url=(base_url or os.environ.get("JOBRADAR_LLM_BASE_URL") or DEFAULT_BASE_URL).rstrip("/"),
@@ -82,6 +102,7 @@ class LLMSettings:
                 or os.environ.get("JOBRADAR_LLM_TIMEOUT")
                 or str(DEFAULT_TIMEOUT_SECONDS)
             ),
+            transport=selected_transport,
         )
 
 
@@ -99,11 +120,13 @@ def judge_jobs(
     output_dir: Path,
     profile: dict[str, Any],
     limit: int = 30,
-    batch_size: int = 5,
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    concurrency: int = DEFAULT_CONCURRENCY,
     selection_mode: str = DEFAULT_SELECTION_MODE,
     settings: LLMSettings | None = None,
     dry_run: bool = False,
     progress: bool = False,
+    max_fallback_ratio: float = DEFAULT_MAX_FALLBACK_RATIO,
 ) -> dict[str, Any]:
     jobs = _load_jobs(input_path)
     selected = _select_jobs(jobs, limit=limit, mode=selection_mode)
@@ -111,12 +134,16 @@ def judge_jobs(
     compact_jobs = [_compact_job(job) for job in selected]
     output_dir.mkdir(parents=True, exist_ok=True)
     batch_size = max(1, min(batch_size, max(1, len(selected))))
+    chunks = _chunks(list(zip(selected, compact_jobs, strict=True)), batch_size)
+    concurrency = max(1, min(concurrency, max(1, len(chunks))))
 
     if dry_run:
         preview = {
             "generated_at": _now(),
             "dry_run": True,
             "batch_size": batch_size,
+            "concurrency": concurrency,
+            "score_weights": {"local": LOCAL_SCORE_WEIGHT, "llm": LLM_SCORE_WEIGHT},
             "selection_mode": selection_mode,
             "profile": profile_summary,
             "jobs": compact_jobs,
@@ -135,35 +162,44 @@ def judge_jobs(
             "Cle LLM absente. Definis JOBRADAR_LLM_API_KEY dans config/.env "
             "ou OPENAI_API_KEY dans l'environnement."
         )
+    _remove_previous_shortlist_outputs(output_dir)
 
-    judgements: dict[str, dict[str, Any]] = {}
-    batch_runs: list[dict[str, Any]] = []
-    pairs = list(zip(selected, compact_jobs, strict=True))
-    chunks = _chunks(pairs, batch_size)
-    for batch_index, chunk in enumerate(chunks, start=1):
-        if progress:
-            print(f"judge_batch_start={batch_index}/{len(chunks)} jobs={len(chunk)}", flush=True)
-        chunk_judgements, chunk_runs = _judge_chunk(settings, profile_summary, chunk)
-        judgements.update(chunk_judgements)
-        batch_runs.extend(chunk_runs)
-        if progress:
-            print(f"judge_batch_done={batch_index}/{len(chunks)} cumulative={len(judgements)}", flush=True)
+    batch_runs: list[dict[str, Any]]
+    judgements, batch_runs = _judge_chunks(
+        settings,
+        profile_summary,
+        chunks,
+        concurrency=concurrency,
+        progress=progress,
+    )
+    quality = _judge_quality_summary(batch_runs, expected_count=len(selected))
+    _validate_judge_quality(quality, max_fallback_ratio=max_fallback_ratio)
 
     annotated = _merge_judgements(selected, judgements)
     annotated.sort(key=lambda item: (item["combined_score"], item["score"]), reverse=True)
     endpoints = sorted({str(run.get("endpoint", "")) for run in batch_runs if run.get("endpoint")})
     response_ids = [str(run.get("response_id", "")) for run in batch_runs if run.get("response_id")]
+    priority_counts = _counts(str(item.get("priority", "")) for item in annotated)
     result = {
         "generated_at": _now(),
         "model": settings.model,
         "base_url": settings.base_url,
         "reasoning_effort": settings.reasoning_effort,
+        "transport": settings.transport,
         "endpoint": ",".join(endpoints) if endpoints else "",
         "response_id": response_ids[0] if response_ids else "",
         "response_ids": response_ids,
         "usage": _sum_usage(run.get("usage") for run in batch_runs),
         "batches": batch_runs,
         "batch_size": batch_size,
+        "concurrency": concurrency,
+        "score_weights": {"local": LOCAL_SCORE_WEIGHT, "llm": LLM_SCORE_WEIGHT},
+        "quality": quality,
+        "fallback_items": quality["fallback_items"],
+        "fallback_batches": quality["fallback_batches"],
+        "fallback_ratio": quality["fallback_ratio"],
+        "endpoint_counts": quality["endpoint_counts"],
+        "priority_counts": priority_counts,
         "input": str(input_path),
         "jobs_fingerprint": jobs_fingerprint(jobs),
         "limit": limit,
@@ -192,6 +228,8 @@ def _select_jobs(jobs: list[dict[str, Any]], *, limit: int, mode: str) -> list[d
     if normalized_mode == "vie":
         selected = sorted([job for job in jobs if _is_vie_job(job)], key=_fit_rank, reverse=True)
         return (selected or jobs)[:capped_limit]
+    if normalized_mode == "wide":
+        return _select_wide_jobs(jobs, capped_limit)
     return _select_balanced_jobs(jobs, capped_limit)
 
 
@@ -224,18 +262,7 @@ def _select_balanced_jobs(jobs: list[dict[str, Any]], limit: int) -> list[dict[s
         early_quota = max(early_quota, 15)
     add(early_jobs, early_quota)
 
-    market_order = [
-        "ireland",
-        "switzerland",
-        "belgium",
-        "singapore",
-        "france",
-        "remote_europe",
-        "netherlands",
-        "luxembourg",
-        "uk",
-        "germany",
-    ]
+    market_order = _market_order()
     market_buckets = {market: [job for job in jobs if job.get("market") == market] for market in market_order}
     while len(selected) < limit:
         progressed = False
@@ -250,6 +277,91 @@ def _select_balanced_jobs(jobs: list[dict[str, Any]], limit: int) -> list[dict[s
 
     add(jobs, limit - len(selected))
     return selected
+
+
+def _select_wide_jobs(jobs: list[dict[str, Any]], limit: int) -> list[dict[str, Any]]:
+    selected: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    score_sorted = sorted(jobs, key=lambda job: (_safe_float(job.get("score"), 0.0), _fit_rank(job)), reverse=True)
+
+    def add(candidates: list[dict[str, Any]], quota: int) -> None:
+        if quota <= 0:
+            return
+        for job in candidates:
+            if len(selected) >= limit or quota <= 0:
+                return
+            key = str(job.get("stable_id") or job.get("url") or id(job))
+            if key in seen:
+                continue
+            seen.add(key)
+            selected.append(job)
+            quota -= 1
+
+    high_signal = [job for job in score_sorted if _safe_float(job.get("score"), 0.0) >= 60.0]
+    add(high_signal, limit)
+    if len(selected) >= limit:
+        return selected
+
+    vie_jobs = sorted(
+        [job for job in jobs if _is_vie_job(job) and _safe_float(job.get("score"), 0.0) >= 45.0],
+        key=_fit_rank,
+        reverse=True,
+    )
+    add(vie_jobs, max(30, int(limit * 0.12)))
+
+    early_jobs = sorted(
+        [
+            job
+            for job in jobs
+            if _is_target_early_career(job) and _safe_float(job.get("score"), 0.0) >= 45.0
+        ],
+        key=_fit_rank,
+        reverse=True,
+    )
+    add(early_jobs, max(20, int(limit * 0.08)))
+
+    market_buckets = {
+        market: [job for job in score_sorted if job.get("market") == market and _safe_float(job.get("score"), 0.0) >= 45.0]
+        for market in _market_order()
+    }
+    while len(selected) < limit:
+        progressed = False
+        for market in _market_order():
+            before = len(selected)
+            add(market_buckets.get(market, []), 1)
+            progressed = progressed or len(selected) > before
+            if len(selected) >= limit:
+                break
+        if not progressed:
+            break
+
+    add(score_sorted, limit - len(selected))
+    return selected
+
+
+def _market_order() -> list[str]:
+    return [
+        "france",
+        "ireland",
+        "switzerland",
+        "belgium",
+        "singapore",
+        "remote_europe",
+        "netherlands",
+        "luxembourg",
+        "uk",
+        "germany",
+        "austria",
+        "sweden",
+        "denmark",
+        "norway",
+        "finland",
+        "spain",
+        "portugal",
+        "estonia",
+        "poland",
+        "czechia",
+    ]
 
 
 def _fit_rank(job: dict[str, Any]) -> float:
@@ -283,6 +395,76 @@ def _counts(values: Any) -> dict[str, int]:
     return dict(sorted(result.items(), key=lambda item: (-item[1], item[0])))
 
 
+def _judge_chunks(
+    settings: LLMSettings,
+    profile_summary: dict[str, Any],
+    chunks: list[list[tuple[dict[str, Any], dict[str, Any]]]],
+    *,
+    concurrency: int,
+    progress: bool,
+) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    if not chunks:
+        return {}, []
+
+    max_workers = max(1, min(concurrency, len(chunks)))
+    if max_workers == 1:
+        judgements: dict[str, dict[str, Any]] = {}
+        batch_runs: list[dict[str, Any]] = []
+        for batch_index, chunk in enumerate(chunks, start=1):
+            if progress:
+                print(f"judge_batch_start={batch_index}/{len(chunks)} jobs={len(chunk)} concurrency=1", flush=True)
+            chunk_judgements, chunk_runs = _judge_chunk_with_retries(settings, profile_summary, chunk)
+            judgements.update(chunk_judgements)
+            batch_runs.extend(chunk_runs)
+            if progress:
+                print(f"judge_batch_done={batch_index}/{len(chunks)} cumulative={len(judgements)}", flush=True)
+        return judgements, batch_runs
+
+    completed: dict[int, tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]] = {}
+    in_flight: dict[concurrent.futures.Future, int] = {}
+    total = len(chunks)
+    next_batch_index = 1
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        def submit(batch_index: int) -> None:
+            chunk = chunks[batch_index - 1]
+            if progress:
+                print(
+                    f"judge_batch_start={batch_index}/{total} jobs={len(chunk)} concurrency={max_workers}",
+                    flush=True,
+                )
+            in_flight[executor.submit(_judge_chunk_with_retries, settings, profile_summary, chunk)] = batch_index
+
+        while next_batch_index <= total and len(in_flight) < max_workers:
+            submit(next_batch_index)
+            next_batch_index += 1
+
+        while in_flight:
+            done, _ = concurrent.futures.wait(in_flight, return_when=concurrent.futures.FIRST_COMPLETED)
+            for future in done:
+                batch_index = in_flight.pop(future)
+                try:
+                    completed[batch_index] = future.result()
+                except BaseException:
+                    for pending in in_flight:
+                        pending.cancel()
+                    raise
+                if progress:
+                    cumulative = sum(len(chunk_judgements) for chunk_judgements, _ in completed.values())
+                    print(f"judge_batch_done={batch_index}/{total} cumulative={cumulative}", flush=True)
+                if next_batch_index <= total:
+                    submit(next_batch_index)
+                    next_batch_index += 1
+
+    judgements: dict[str, dict[str, Any]] = {}
+    batch_runs: list[dict[str, Any]] = []
+    for batch_index in range(1, total + 1):
+        chunk_judgements, chunk_runs = completed[batch_index]
+        judgements.update(chunk_judgements)
+        batch_runs.extend(chunk_runs)
+    return judgements, batch_runs
+
+
 def _judge_chunk(
     settings: LLMSettings,
     profile_summary: dict[str, Any],
@@ -306,14 +488,51 @@ def _judge_chunk(
         return judgements, [run]
     except LLMCallError:
         raise
-    except LLMJudgeError:
+    except LLMJudgeError as exc:
         if len(pairs) <= 1:
-            raise
+            raise LLMJudgeError(f"Jugement structurel invalide pour singleton: {exc}") from exc
         middle = len(pairs) // 2
         left_judgements, left_runs = _judge_chunk(settings, profile_summary, pairs[:middle])
         right_judgements, right_runs = _judge_chunk(settings, profile_summary, pairs[middle:])
         left_judgements.update(right_judgements)
         return left_judgements, left_runs + right_runs
+
+
+def _judge_chunk_with_retries(
+    settings: LLMSettings,
+    profile_summary: dict[str, Any],
+    pairs: list[tuple[dict[str, Any], dict[str, Any]]],
+) -> tuple[dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    last_error = ""
+    for attempt in range(1, LLM_BATCH_MAX_ATTEMPTS + 1):
+        try:
+            judgements, runs = _judge_chunk(settings, profile_summary, pairs)
+            if attempt > 1:
+                for run in runs:
+                    run["retry_attempt"] = attempt
+            return judgements, runs
+        except (LLMCallError, LLMJudgeError) as exc:
+            last_error = str(exc)
+            if attempt >= LLM_BATCH_MAX_ATTEMPTS:
+                break
+            time.sleep(LLM_BATCH_RETRY_SECONDS * attempt)
+
+    originals = [pair[0] for pair in pairs]
+    judgements = {
+        str(job.get("stable_id", "")): _default_judgement(str(job.get("stable_id", "")))
+        for job in originals
+        if job.get("stable_id")
+    }
+    run = {
+        "count": len(pairs),
+        "ids": [str(job.get("stable_id", "")) for job in originals if job.get("stable_id")],
+        "endpoint": "fallback_default",
+        "response_id": "",
+        "usage": {},
+        "error": last_error,
+        "attempts": LLM_BATCH_MAX_ATTEMPTS,
+    }
+    return judgements, [run]
 
 
 def _ensure_complete_judgements(judgements: dict[str, dict[str, Any]], jobs: list[dict[str, Any]]) -> None:
@@ -326,17 +545,46 @@ def _ensure_complete_judgements(judgements: dict[str, dict[str, Any]], jobs: lis
         raise LLMJudgeError(f"Reponse LLM incomplete: {len(missing)} jugement(s) manquant(s): {preview}{extra}.")
 
 
+def _judge_quality_summary(batch_runs: list[dict[str, Any]], *, expected_count: int) -> dict[str, Any]:
+    endpoint_counts = _counts(str(run.get("endpoint", "")) for run in batch_runs)
+    fallback_runs = [run for run in batch_runs if run.get("endpoint") == "fallback_default"]
+    fallback_items = sum(int(run.get("count") or 0) for run in fallback_runs)
+    expected = max(0, int(expected_count))
+    fallback_ratio = (fallback_items / expected) if expected else 0.0
+    return {
+        "expected_items": expected,
+        "batch_count": len(batch_runs),
+        "fallback_batches": len(fallback_runs),
+        "fallback_items": fallback_items,
+        "fallback_ratio": round(fallback_ratio, 6),
+        "endpoint_counts": endpoint_counts,
+        "fallback_errors": [str(run.get("error", ""))[:500] for run in fallback_runs if run.get("error")][:10],
+    }
+
+
+def _validate_judge_quality(quality: dict[str, Any], *, max_fallback_ratio: float) -> None:
+    ratio = _safe_float(quality.get("fallback_ratio"), 0.0)
+    fallback_items = int(quality.get("fallback_items") or 0)
+    expected_items = int(quality.get("expected_items") or 0)
+    if fallback_items and ratio > max(0.0, max_fallback_ratio):
+        raise LLMJudgeError(
+            "Qualite judge LLM insuffisante: "
+            f"{fallback_items}/{expected_items} offre(s) en fallback_default "
+            f"({ratio:.1%}, maximum {max_fallback_ratio:.1%}). "
+            "Aucun llm_shortlist final n'a ete ecrit; relancer avec un provider/effort/batch plus stable."
+        )
+
+
 def call_model(settings: LLMSettings, request_payload: dict[str, Any]) -> ModelResult:
-    attempts: list[tuple[str, dict[str, Any]]] = [
-        ("responses", _responses_payload(settings, request_payload, json_mode=True)),
-        ("responses_plain", _responses_payload(settings, request_payload, json_mode=False)),
-        ("chat_completions", _chat_payload(settings, request_payload)),
-    ]
+    attempts = _transport_attempts(settings, request_payload)
     errors: list[str] = []
     for endpoint_name, payload in attempts:
-        url = _endpoint_url(settings.base_url, endpoint_name)
         try:
-            data = _post_json(url, payload, settings.api_key, settings.timeout_seconds)
+            if endpoint_name == "responses_sdk":
+                data = _post_responses_sdk(settings, payload)
+            else:
+                url = _endpoint_url(settings.base_url, endpoint_name)
+                data = _post_json(url, payload, settings.api_key, settings.timeout_seconds)
             text = extract_output_text(data)
             if not text:
                 raise LLMJudgeError(f"Reponse LLM sans texte sur {endpoint_name}.")
@@ -353,6 +601,68 @@ def call_model(settings: LLMSettings, request_payload: dict[str, Any]) -> ModelR
         except LLMJudgeError as exc:
             errors.append(str(exc))
     raise LLMCallError("Tous les appels LLM ont echoue:\n- " + "\n- ".join(errors))
+
+
+def _transport_attempts(settings: LLMSettings, request_payload: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    attempts: list[tuple[str, dict[str, Any]]] = []
+    responses_json = _responses_payload(settings, request_payload, json_mode=True)
+    if settings.transport in {"auto", "sdk"}:
+        if _openai_sdk_available():
+            attempts.append(("responses_sdk", responses_json))
+        elif settings.transport == "sdk":
+            raise LLMCallError("Transport OpenAI SDK demande mais le package `openai` est indisponible.")
+    if settings.transport in {"auto", "raw"}:
+        attempts.extend(
+            [
+                ("responses", responses_json),
+                ("responses_plain", _responses_payload(settings, request_payload, json_mode=False)),
+                ("chat_completions", _chat_payload(settings, request_payload)),
+            ]
+        )
+    if not attempts:
+        raise LLMCallError(f"Aucun transport LLM disponible pour `{settings.transport}`.")
+    return attempts
+
+
+def _openai_sdk_available() -> bool:
+    return importlib.util.find_spec("openai") is not None
+
+
+def _post_responses_sdk(settings: LLMSettings, payload: dict[str, Any]) -> dict[str, Any]:
+    try:
+        from openai import APIConnectionError, APIStatusError, APITimeoutError, OpenAI
+    except ImportError as exc:
+        raise LLMCallError("Package OpenAI SDK indisponible.") from exc
+
+    url = _endpoint_url(settings.base_url, "responses")
+    try:
+        client = OpenAI(
+            base_url=settings.base_url,
+            api_key=settings.api_key,
+            timeout=settings.timeout_seconds,
+            max_retries=0,
+        )
+        response = client.responses.create(**payload)
+    except APIStatusError as exc:
+        body = ""
+        response = getattr(exc, "response", None)
+        if response is not None:
+            body = getattr(response, "text", "") or ""
+        raise LLMHTTPError(int(getattr(exc, "status_code", 0) or 0), url, body or str(exc)) from exc
+    except (APIConnectionError, APITimeoutError) as exc:
+        raise LLMCallError(f"Erreur reseau LLM SDK sur {_safe_url(url)}: {_redact(str(exc))}") from exc
+    except Exception as exc:
+        raise LLMJudgeError(f"Erreur SDK OpenAI sur {_safe_url(url)}: {_redact(str(exc))}") from exc
+
+    if hasattr(response, "model_dump"):
+        data = response.model_dump(mode="json")
+    elif isinstance(response, dict):
+        data = response
+    else:
+        raise LLMJudgeError("Reponse SDK OpenAI inattendue.")
+    if not isinstance(data, dict):
+        raise LLMJudgeError("Reponse SDK OpenAI non objet.")
+    return data
 
 
 def extract_output_text(data: dict[str, Any]) -> str:
@@ -559,6 +869,7 @@ def _judge_request_payload(profile_summary: dict[str, Any], jobs: list[dict[str,
             f"Offres:\n{json.dumps(jobs, ensure_ascii=False, indent=2)}"
         ),
         "job_count": len(jobs),
+        "job_ids": [str(job.get("stable_id", "")) for job in jobs if job.get("stable_id")],
     }
 
 
@@ -596,7 +907,7 @@ def _responses_payload(settings: LLMSettings, request_payload: dict[str, Any], *
     if settings.reasoning_effort != "none":
         payload["reasoning"] = {"effort": settings.reasoning_effort}
     if json_mode:
-        payload["text"] = {"format": {"type": "json_object"}}
+        payload["text"] = {"format": _structured_output_format(request_payload)}
     return payload
 
 
@@ -608,7 +919,7 @@ def _chat_payload(settings: LLMSettings, request_payload: dict[str, Any]) -> dic
             {"role": "system", "content": request_payload["system"]},
             {"role": "user", "content": request_payload["user"]},
         ],
-        "response_format": {"type": "json_object"},
+        "response_format": _chat_response_format(request_payload),
         "max_completion_tokens": max_output_tokens,
     }
     if settings.reasoning_effort != "none":
@@ -616,8 +927,92 @@ def _chat_payload(settings: LLMSettings, request_payload: dict[str, Any]) -> dic
     return payload
 
 
+def _structured_output_format(request_payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "name": "jobradai_judge",
+        "strict": True,
+        "schema": _judgement_json_schema(request_payload),
+    }
+
+
+def _chat_response_format(request_payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "jobradai_judge",
+            "strict": True,
+            "schema": _judgement_json_schema(request_payload),
+        },
+    }
+
+
+def _judgement_json_schema(request_payload: dict[str, Any]) -> dict[str, Any]:
+    job_ids = [str(item) for item in request_payload.get("job_ids", []) if str(item)]
+    stable_id_schema: dict[str, Any] = {"type": "string"}
+    if job_ids:
+        stable_id_schema["enum"] = job_ids
+    item_schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "stable_id": stable_id_schema,
+            "fit_score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "priority": {"type": "string", "enum": sorted(VALID_PRIORITIES)},
+            "level_fit": {"type": "string", "enum": sorted(VALID_LEVEL_FITS)},
+            "salary_check": {"type": "string", "enum": sorted(VALID_SALARY_CHECKS)},
+            "remote_check": {"type": "string", "enum": sorted(VALID_REMOTE_CHECKS)},
+            "start_date_check": {"type": "string", "enum": sorted(VALID_START_DATE_CHECKS)},
+            "start_date_evidence": {"type": "string"},
+            "language_check": {"type": "string", "enum": sorted(VALID_LANGUAGE_CHECKS)},
+            "remote_location_validity": {"type": "string", "enum": sorted(VALID_REMOTE_LOCATION_VALIDITY)},
+            "why": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 4,
+                "items": {"type": "string"},
+            },
+            "risks": {
+                "type": "array",
+                "minItems": 0,
+                "maxItems": 4,
+                "items": {"type": "string"},
+            },
+            "application_angle": {"type": "string"},
+        },
+        "required": [
+            "stable_id",
+            "fit_score",
+            "priority",
+            "level_fit",
+            "salary_check",
+            "remote_check",
+            "start_date_check",
+            "start_date_evidence",
+            "language_check",
+            "remote_location_validity",
+            "why",
+            "risks",
+            "application_angle",
+        ],
+    }
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "items": {
+                "type": "array",
+                "minItems": len(job_ids),
+                "maxItems": len(job_ids),
+                "items": item_schema,
+            }
+        },
+        "required": ["items"],
+    }
+
+
 def _endpoint_url(base_url: str, endpoint_name: str) -> str:
-    if endpoint_name in {"responses", "responses_plain"}:
+    if endpoint_name in {"responses", "responses_plain", "responses_sdk"}:
         return f"{base_url}/responses"
     if endpoint_name == "chat_completions":
         return f"{base_url}/chat/completions"
@@ -677,6 +1072,7 @@ def _normalise_judgements(raw: dict[str, Any] | list[Any], jobs: list[dict[str, 
             priority = "skip"
         result[stable_id] = {
             "stable_id": stable_id,
+            "judge_status": "model",
             "fit_score": _clamp_score(row.get("fit_score", 50)),
             "priority": priority,
             "level_fit": level_fit,
@@ -703,9 +1099,10 @@ def _merge_judgements(jobs: list[dict[str, Any]], judgements: dict[str, dict[str
         merged.append(
             {
                 "stable_id": stable_id,
-                "combined_score": round((score * 0.70) + (fit_score * 0.30), 2),
+                "combined_score": round((score * LOCAL_SCORE_WEIGHT) + (fit_score * LLM_SCORE_WEIGHT), 2),
                 "score": round(score, 2),
                 "llm_fit_score": round(fit_score, 2),
+                "llm_judge_status": judgement.get("judge_status", "model"),
                 "priority": judgement["priority"],
                 "level_fit": judgement["level_fit"],
                 "salary_check": judgement["salary_check"],
@@ -738,6 +1135,7 @@ def _merge_judgements(jobs: list[dict[str, Any]], judgements: dict[str, dict[str
 def _default_judgement(stable_id: str) -> dict[str, Any]:
     return {
         "stable_id": stable_id,
+        "judge_status": "fallback_default",
         "fit_score": 50,
         "priority": "maybe",
         "level_fit": "unknown",
@@ -757,6 +1155,13 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _remove_previous_shortlist_outputs(output_dir: Path) -> None:
+    for name in ("llm_shortlist.json", "llm_shortlist.md"):
+        path = output_dir / name
+        if path.exists():
+            path.unlink()
+
+
 def _write_markdown(path: Path, result: dict[str, Any]) -> None:
     lines = [
         "# Shortlist LLM",
@@ -768,6 +1173,10 @@ def _write_markdown(path: Path, result: dict[str, Any]) -> None:
         f"- Selection: `{result.get('selection_mode', 'n/a')}`",
         f"- Resume selection: `{result.get('selection_summary', {})}`",
         f"- Batchs: **{len(result.get('batches', []))}** x max `{result.get('batch_size', 'n/a')}`",
+        f"- Parallele: `{result.get('concurrency', 1)}` batch(s) simultane(s)",
+        f"- Score combine: local `{LOCAL_SCORE_WEIGHT:.0%}` | LLM `{LLM_SCORE_WEIGHT:.0%}`",
+        f"- Qualite: fallback `{result.get('fallback_items', 0)}` / `{result['count']}` ({result.get('fallback_ratio', 0):.1%}) | endpoints `{result.get('endpoint_counts', {})}`",
+        f"- Priorites: `{result.get('priority_counts', {})}`",
         f"- Offres jugees: **{result['count']}**",
         "",
         "## Classement",

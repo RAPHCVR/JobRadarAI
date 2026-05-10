@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+import json
+import tempfile
+import threading
+import time
 import unittest
+from pathlib import Path
 
 from jobradai.llm_judge import (
     _chunks,
@@ -8,14 +13,18 @@ from jobradai.llm_judge import (
     _ensure_complete_judgements,
     _merge_judgements,
     _normalise_judgements,
+    _judge_chunks,
     _select_jobs,
+    _structured_output_format,
     _sum_usage,
+    _transport_attempts,
     _judge_chunk,
     _post_json,
     extract_output_text,
     LLMCallError,
     LLMJudgeError,
     LLMSettings,
+    judge_jobs,
     parse_json_object,
 )
 import jobradai.llm_judge as llm_judge
@@ -90,7 +99,7 @@ class LLMJudgeTests(unittest.TestCase):
             }
         }
         [merged] = _merge_judgements(jobs, judgements)
-        self.assertEqual(merged["combined_score"], 83.0)
+        self.assertEqual(merged["combined_score"], 86.0)
         self.assertEqual(merged["llm_fit_score"], 90)
         self.assertEqual(merged["priority"], "apply_now")
         self.assertEqual(merged["start_date_check"], "compatible")
@@ -180,6 +189,29 @@ class LLMJudgeTests(unittest.TestCase):
         selected = _select_jobs(jobs, limit=2, mode="balanced")
         self.assertEqual(selected[1]["stable_id"], "fit-vie")
 
+    def test_wide_selection_prioritizes_all_high_signal_jobs_before_lower_fill(self) -> None:
+        jobs = [
+            {"stable_id": "high-fr", "score": 82, "market": "france", "source": "ATS"},
+            {"stable_id": "high-pl", "score": 64, "market": "poland", "source": "ATS"},
+            {"stable_id": "high-cz", "score": 61, "market": "czechia", "source": "ATS"},
+            {"stable_id": "vie-low", "score": 48, "market": "belgium", "source": "Business France VIE"},
+        ]
+        selected = _select_jobs(jobs, limit=3, mode="wide")
+        self.assertEqual([job["stable_id"] for job in selected], ["high-fr", "high-pl", "high-cz"])
+        selected_with_fill = _select_jobs(jobs, limit=4, mode="wide")
+        self.assertIn("vie-low", [job["stable_id"] for job in selected_with_fill])
+
+    def test_wide_selection_rotates_expanded_markets_when_filling(self) -> None:
+        jobs = [
+            {"stable_id": "top", "score": 80, "market": "france", "source": "ATS"},
+            {"stable_id": "es", "score": 52, "market": "spain", "source": "ATS"},
+            {"stable_id": "pt", "score": 51, "market": "portugal", "source": "ATS"},
+            {"stable_id": "cz", "score": 50, "market": "czechia", "source": "ATS"},
+            {"stable_id": "weak", "score": 40, "market": "france", "source": "ATS"},
+        ]
+        selected = _select_jobs(jobs, limit=4, mode="wide")
+        self.assertEqual({job["stable_id"] for job in selected}, {"top", "es", "pt", "cz"})
+
     def test_transport_error_does_not_split_batches(self) -> None:
         calls = 0
 
@@ -202,6 +234,168 @@ class LLMJudgeTests(unittest.TestCase):
             self.assertEqual(calls, 1)
         finally:
             llm_judge.call_model = original
+
+    def test_singleton_structural_judge_error_raises_for_retry(self) -> None:
+        def incomplete_call(*args, **kwargs):
+            return llm_judge.ModelResult(text='{"items": []}', endpoint="fake")
+
+        original = llm_judge.call_model
+        llm_judge.call_model = incomplete_call
+        try:
+            settings = LLMSettings(base_url="https://example.com/v1", api_key="test")
+            pairs = [({"stable_id": "lonely"}, {"stable_id": "lonely"})]
+            with self.assertRaises(LLMJudgeError) as ctx:
+                _judge_chunk(settings, {}, pairs)
+        finally:
+            llm_judge.call_model = original
+
+        self.assertIn("singleton", str(ctx.exception))
+
+    def test_chunk_transport_errors_retry_then_fallback_to_defaults(self) -> None:
+        original_chunk = llm_judge._judge_chunk
+        original_attempts = llm_judge.LLM_BATCH_MAX_ATTEMPTS
+        original_sleep = llm_judge.LLM_BATCH_RETRY_SECONDS
+
+        def fail_chunk(*args, **kwargs):
+            raise LLMCallError("bridge queue is full")
+
+        llm_judge._judge_chunk = fail_chunk
+        llm_judge.LLM_BATCH_MAX_ATTEMPTS = 2
+        llm_judge.LLM_BATCH_RETRY_SECONDS = 0
+        try:
+            settings = LLMSettings(base_url="https://example.com/v1", api_key="test")
+            pairs = [
+                ({"stable_id": "a"}, {"stable_id": "a"}),
+                ({"stable_id": "b"}, {"stable_id": "b"}),
+            ]
+            judgements, runs = llm_judge._judge_chunk_with_retries(settings, {}, pairs)
+        finally:
+            llm_judge._judge_chunk = original_chunk
+            llm_judge.LLM_BATCH_MAX_ATTEMPTS = original_attempts
+            llm_judge.LLM_BATCH_RETRY_SECONDS = original_sleep
+
+        self.assertEqual(set(judgements), {"a", "b"})
+        self.assertTrue(all(item["fit_score"] == 50 for item in judgements.values()))
+        self.assertEqual(runs[0]["endpoint"], "fallback_default")
+        self.assertEqual(runs[0]["attempts"], 2)
+
+    def test_chunk_structural_errors_retry_then_fallback_to_defaults(self) -> None:
+        original_chunk = llm_judge._judge_chunk
+        original_attempts = llm_judge.LLM_BATCH_MAX_ATTEMPTS
+        original_sleep = llm_judge.LLM_BATCH_RETRY_SECONDS
+
+        def fail_chunk(*args, **kwargs):
+            raise LLMJudgeError("missing stable_id")
+
+        llm_judge._judge_chunk = fail_chunk
+        llm_judge.LLM_BATCH_MAX_ATTEMPTS = 2
+        llm_judge.LLM_BATCH_RETRY_SECONDS = 0
+        try:
+            settings = LLMSettings(base_url="https://example.com/v1", api_key="test")
+            pairs = [({"stable_id": "a"}, {"stable_id": "a"})]
+            judgements, runs = llm_judge._judge_chunk_with_retries(settings, {}, pairs)
+        finally:
+            llm_judge._judge_chunk = original_chunk
+            llm_judge.LLM_BATCH_MAX_ATTEMPTS = original_attempts
+            llm_judge.LLM_BATCH_RETRY_SECONDS = original_sleep
+
+        self.assertEqual(set(judgements), {"a"})
+        self.assertEqual(judgements["a"]["priority"], "maybe")
+        self.assertEqual(judgements["a"]["judge_status"], "fallback_default")
+        self.assertEqual(runs[0]["endpoint"], "fallback_default")
+        self.assertIn("missing stable_id", runs[0]["error"])
+
+    def test_structured_output_format_constrains_ids_and_required_fields(self) -> None:
+        schema_format = _structured_output_format({"job_ids": ["a", "b"]})
+        self.assertEqual(schema_format["type"], "json_schema")
+        schema = schema_format["schema"]
+        item_schema = schema["properties"]["items"]["items"]
+        self.assertEqual(schema["properties"]["items"]["minItems"], 2)
+        self.assertEqual(item_schema["properties"]["stable_id"]["enum"], ["a", "b"])
+        self.assertIn("application_angle", item_schema["required"])
+
+    def test_transport_attempts_respect_raw_mode(self) -> None:
+        settings = LLMSettings(base_url="https://example.com/v1", api_key="test", transport="raw")
+        attempts = _transport_attempts(settings, {"system": "sys", "user": "JSON {}", "job_count": 1})
+        self.assertEqual([name for name, _ in attempts], ["responses", "responses_plain", "chat_completions"])
+
+    def test_judge_jobs_rejects_high_fallback_ratio_and_removes_previous_shortlist(self) -> None:
+        original_chunks = llm_judge._judge_chunks
+
+        def fake_chunks(*args, **kwargs):
+            return (
+                {"a": llm_judge._default_judgement("a")},
+                [{"count": 1, "ids": ["a"], "endpoint": "fallback_default", "error": "bad output"}],
+            )
+
+        llm_judge._judge_chunks = fake_chunks
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                jobs_path = root / "jobs.json"
+                output_dir = root / "out"
+                output_dir.mkdir()
+                jobs_path.write_text(
+                    json.dumps(
+                        [
+                            {
+                                "stable_id": "a",
+                                "title": "Data Engineer",
+                                "company": "Acme",
+                                "score": 80,
+                            }
+                        ]
+                    ),
+                    encoding="utf-8",
+                )
+                (output_dir / "llm_shortlist.json").write_text("{}", encoding="utf-8")
+                with self.assertRaises(LLMJudgeError) as ctx:
+                    judge_jobs(
+                        input_path=jobs_path,
+                        output_dir=output_dir,
+                        profile={},
+                        settings=LLMSettings(base_url="https://example.com/v1", api_key="test"),
+                        limit=1,
+                        max_fallback_ratio=0.05,
+                    )
+                self.assertIn("Qualite judge LLM insuffisante", str(ctx.exception))
+                self.assertFalse((output_dir / "llm_shortlist.json").exists())
+        finally:
+            llm_judge._judge_chunks = original_chunks
+
+    def test_judge_chunks_parallelizes_but_preserves_batch_run_order(self) -> None:
+        original = llm_judge._judge_chunk
+        active = 0
+        max_active = 0
+        lock = threading.Lock()
+
+        def fake_judge_chunk(settings, profile_summary, pairs):
+            nonlocal active, max_active
+            stable_id = str(pairs[0][0]["stable_id"])
+            with lock:
+                active += 1
+                max_active = max(max_active, active)
+            try:
+                time.sleep(0.03 if stable_id == "slow" else 0.01)
+                return ({stable_id: {"fit_score": 80}}, [{"response_id": stable_id, "endpoint": "fake"}])
+            finally:
+                with lock:
+                    active -= 1
+
+        llm_judge._judge_chunk = fake_judge_chunk
+        try:
+            settings = LLMSettings(base_url="https://example.com/v1", api_key="test")
+            chunks = [
+                [({"stable_id": "slow"}, {"stable_id": "slow"})],
+                [({"stable_id": "fast"}, {"stable_id": "fast"})],
+            ]
+            judgements, batch_runs = _judge_chunks(settings, {}, chunks, concurrency=2, progress=False)
+        finally:
+            llm_judge._judge_chunk = original
+
+        self.assertEqual(set(judgements), {"slow", "fast"})
+        self.assertEqual([run["response_id"] for run in batch_runs], ["slow", "fast"])
+        self.assertEqual(max_active, 2)
 
     def test_post_json_wraps_socket_timeout(self) -> None:
         original = llm_judge.urllib.request.urlopen

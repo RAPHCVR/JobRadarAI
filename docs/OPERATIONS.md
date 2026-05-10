@@ -11,13 +11,13 @@ uv run --no-project --with-editable . -- python -m jobradai run --max-per-source
 Run complet conseille quand tu veux une shortlist finale:
 
 ```powershell
-.\scripts\run_daily.ps1 -Judge -JudgeRequired -JudgeLimit 120 -JudgeBatchSize 5 -JudgeSelectionMode balanced -JudgeEffort high
+.\scripts\run_daily.ps1 -Judge -JudgeRequired -JudgeLimit 1200 -JudgeBatchSize 10 -JudgeConcurrency 1 -JudgeSelectionMode wide -JudgeEffort medium -JudgeTransport auto
 ```
 
-Run large ponctuel avant candidature:
+Run tres large ponctuel avant candidature:
 
 ```powershell
-.\scripts\run_daily.ps1 -Judge -JudgeRequired -JudgeLimit 200 -JudgeBatchSize 5 -JudgeSelectionMode balanced -JudgeEffort medium -JudgeTimeoutSeconds 360
+.\scripts\run_daily.ps1 -Judge -JudgeRequired -JudgeLimit 2000 -JudgeBatchSize 10 -JudgeConcurrency 1 -JudgeSelectionMode wide -JudgeEffort medium -JudgeTransport auto -JudgeTimeoutSeconds 600
 ```
 
 Ce run genere:
@@ -40,7 +40,9 @@ Ce run genere:
 - `runs/history/job_history.sqlite`
 
 Le judge LLM est retente par defaut 3 fois avec 30 secondes d'attente (`-JudgeMaxAttempts`, `-JudgeRetrySeconds`). Si le judge echoue, le script regenere quand meme l'audit pour ne pas laisser `runs/latest` sans rapport frais. Avec `-JudgeRequired`, le script sort en erreur apres audit/snapshot si la shortlist LLM n'est pas produite.
-`-JudgeTimeoutSeconds` controle le timeout LLM par appel batch. Le defaut est 360 secondes pour eviter de perdre un run large sur un batch lent; le script logge la progression `judge_batch_start/done` par batch et retente le judge complet si besoin.
+`-JudgeTimeoutSeconds` controle le timeout LLM par appel batch. Le defaut est 360 secondes pour eviter de perdre un run large sur un batch lent; `-JudgeBatchSize 10` est le compromis calibre sur codexlb/Responses SDK: batch 5 marche mais coute plus cher en overhead, batch 20 a ete plus lent et a degrade le transport. `-JudgeConcurrency 1` est le defaut prod actuel parce que codexlb peut saturer la file `responses session bridge` au-dessus. `-JudgeConcurrency 2` peut se tester ponctuellement, mais `5` n'est pas recommande sans surveillance des logs codexlb.
+`-JudgeTransport auto` utilise l'OpenAI Python SDK quand il est disponible avec `JOBRADAR_LLM_BASE_URL` custom, puis fallback REST controle. Le judge impose une sortie JSON Schema stricte et un quality gate `-JudgeMaxFallbackRatio 0.01`: si trop d'items tombent en `fallback_default`, le run echoue et n'ecrit pas de shortlist finale.
+Le score final est volontairement hybride mais LLM-majoritaire: `combined_score = 40% score local + 60% fit_score LLM`. Le score local sert de garde-fou explicable et de retrieval large; le judge LLM domine le reranking final sans devenir l'unique signal.
 
 Le link-check est actif par defaut dans `run_daily.ps1`:
 
@@ -64,6 +66,14 @@ Le registre multi-run est actif par defaut:
 - `runs/latest/application_queue.md` concatene les offres pertinentes anciennes et nouvelles, dedupees.
 - `runs/latest/application_messages.md` prepare des messages RH brouillons pour candidature manuelle.
 - `runs/latest/history_dashboard.md` et `weekly_digest.md` comparent le run courant au precedent: nouvelles, revenues, disparues, stale et expirees.
+
+Lecture correcte des deltas:
+
+- `current_jobs` compte uniquement le dernier run.
+- `known_jobs` compte tout ce que le ledger a deja vu.
+- `missing_this_run` est cumulatif: ce sont les offres deja connues mais absentes du dernier run, pas seulement les offres perdues depuis le run precedent.
+- Pour mesurer la vraie variation du dernier run, comparer `runs/history/<previous>/jobs.json` avec `runs/latest/jobs.json`.
+- Jooble peut fournir des liens avec parametres de tracking changeants; les IDs stables ignorent maintenant ces parametres pour eviter du faux churn `new/stale`.
 
 ## Commandes Directes
 
@@ -101,7 +111,7 @@ Historique multi-run seul:
 Judge large seul:
 
 ```powershell
-.\scripts\run_judge.ps1 -Limit 200 -BatchSize 5 -SelectionMode balanced -Effort medium -TimeoutSeconds 360
+.\scripts\run_judge.ps1 -Limit 1200 -BatchSize 10 -Concurrency 1 -SelectionMode wide -Effort medium -Transport auto -TimeoutSeconds 600
 ```
 
 Sources configurees:
@@ -184,7 +194,7 @@ schtasks /Create /F /SC DAILY /ST 08:30 /TN "JobRadarAI-Daily" /TR "pwsh -NoProf
 Tache planifiee avec shortlist finale:
 
 ```powershell
-schtasks /Create /F /SC DAILY /ST 08:30 /TN "JobRadarAI-Daily" /TR "pwsh -NoProfile -ExecutionPolicy Bypass -File C:\Users\Raphael\Documents\JobRadarAI\scripts\run_daily.ps1 -Judge -JudgeRequired -JudgeLimit 120 -JudgeBatchSize 5 -JudgeSelectionMode balanced -JudgeEffort high"
+schtasks /Create /F /SC DAILY /ST 08:30 /TN "JobRadarAI-Daily" /TR "pwsh -NoProfile -ExecutionPolicy Bypass -File C:\Users\Raphael\Documents\JobRadarAI\scripts\run_daily.ps1 -Judge -JudgeRequired -JudgeLimit 1200 -JudgeBatchSize 10 -JudgeConcurrency 1 -JudgeSelectionMode wide -JudgeEffort medium -JudgeTransport auto"
 ```
 
 Desactiver la tache conservee:
@@ -207,19 +217,21 @@ Configuration dans `config/.env`:
 JOBRADAR_LLM_BASE_URL=https://codex.raphcvr.me/v1
 JOBRADAR_LLM_API_KEY=...
 JOBRADAR_LLM_MODEL=gpt-5.4-mini
-JOBRADAR_LLM_REASONING_EFFORT=high
+JOBRADAR_LLM_REASONING_EFFORT=medium
+JOBRADAR_LLM_TRANSPORT=auto
 JOBRADAR_LLM_TIMEOUT_SECONDS=360
 ```
 
 Commande directe:
 
 ```powershell
-.\scripts\run_judge.ps1 -Limit 120 -BatchSize 5 -SelectionMode balanced -Effort high
+.\scripts\run_judge.ps1 -Limit 1200 -BatchSize 10 -Concurrency 1 -SelectionMode wide -Effort medium -Transport auto
 ```
 
 Modes de selection:
 
-- `balanced`: recommande; mix top global, VIE, graduate/early-career/doctorat industriel technique et couverture marches.
+- `wide`: recommande; prend d'abord toutes les offres a score local >= 60 dans la limite donnee, puis complete avec VIE, graduate/early-career/doctorat industriel technique et couverture marches.
+- `balanced`: ancien mode routine; mix top global, VIE, graduate/early-career/doctorat industriel technique et couverture marches.
 - `top`: top local pur.
 - `vie`: uniquement VIE, trie par fit technique/role.
 - `all`: tout le corpus exporte; utile pour une passe exhaustive mais lent.

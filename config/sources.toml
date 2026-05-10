@@ -46,17 +46,21 @@ queries = [
 
 [forem]
 endpoint = "https://www.odwb.be/api/explore/v2.1/catalog/datasets/offres-d-emploi-forem/records"
-max_queries = 18
+max_queries = 24
 results_per_query = 60
+queries = ["Data Scientist", "Data Analyst", "Data Quality Analyst"]
 
 [actiris]
 endpoint = "https://www.actiris.brussels/Umbraco/api/OffersApi/GetAllOffers"
-max_queries = 18
+max_queries = 24
 page_size = 20
 max_pages = 2
+queries = ["Data Scientist", "Data Analyst", "Data Quality Analyst"]
 
 [france_travail]
-max_queries = 42
+max_queries = 48
+page_size = 50
+max_pages = 3
 
 [bundesagentur]
 endpoint = "https://rest.arbeitsagentur.de/jobboerse/jobsuche-service/pc/v4/jobs"
@@ -173,7 +177,7 @@ max_items = 260
 
 [germantechjobs]
 feed = "https://germantechjobs.de/rss"
-max_items = 400
+max_items = 1200
 
 [jooble]
 max_queries = 8

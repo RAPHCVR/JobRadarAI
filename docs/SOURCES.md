@@ -5,8 +5,8 @@
 | Source | Type | Usage |
 |---|---|---|
 | Business France VIE | API officielle publique | Missions VIE a l'etranger via Mon Volontariat International; scan pagine large puis tri score/LLM |
-| Le Forem Open Data | API open data officielle | Offres Forem/partenaires Wallonie-Bruxelles, avec une partie des offres VDAB traduites en francais |
-| Actiris | Endpoint JSON public du site officiel | Offres Bruxelles/Belgique, requetes limitees et filtre local |
+| Le Forem Open Data | API open data officielle | Offres Forem/partenaires Wallonie-Bruxelles, avec une partie des offres VDAB traduites en francais; 24 termes dont data analyst/data quality |
+| Actiris | Endpoint JSON public du site officiel | Offres Bruxelles/Belgique, requetes limitees et filtre local; 24 termes dont data analyst/data quality |
 | Bundesagentur Jobsuche | API publique officielle | Allemagne + Autriche data/AI/LLM, filtree par pays pour distinguer `Deutschland` et `Österreich` |
 | JobTechDev Sweden | API publique officielle | Suede via JobSearch API, bon signal Stockholm/tech/data sans scraper |
 | NAV Arbeidsplassen | Endpoint public officiel | Norvege via recherche publique Arbeidsplassen, bon signal data/AI mais langue norvegienne a verifier |
@@ -16,11 +16,11 @@
 | Remotive | API publique | Remote global, attribution requise |
 | Arbeitnow | API publique | Europe, surtout Allemagne/remote |
 | RemoteOK | API publique | Remote, a filtrer strictement |
-| Jobicy | API publique | Remote, variable selon tags |
+| Jobicy | API publique | Remote global; fallback global filtre localement car les tags API sont parfois trop specifiques |
 | Himalayas | API publique | Remote, variable |
 | WeWorkRemotely | RSS public | Remote programming/devops; filtre local fort car le flux est global et parfois US-centric |
 | SwissDevJobs | RSS public | Suisse tech avec salaires souvent publics, tres utile pour data/AI/backend |
-| GermanTechJobs | RSS public | Allemagne/Autriche remote/hybride avec salaires souvent publics, complement tech a Bundesagentur |
+| GermanTechJobs | RSS public | Allemagne/Autriche remote/hybride avec salaires souvent publics; scan cappe haut et borne car le RSS live depasse 2000 items et un cap trop bas provoque du churn artificiel |
 | JobSpy Direct | Scraper controle via uv | Indeed par defaut, LinkedIn desactive, timeout borne pour rester un fallback non bloquant |
 | Greenhouse | ATS direct | Tres fiable si board connu |
 | Lever | ATS direct | Tres fiable si company slug connu |
@@ -32,7 +32,7 @@
 
 | Source | Type | Pourquoi |
 |---|---|---|
-| France Travail | API officielle | Meilleur socle France |
+| France Travail | API officielle | Meilleur socle France; pagination `3 x 50` par requete, dedupe par ID et termes France data/science/MDM pour eviter de perdre les offres live hors premiere page |
 | Jooble | API job search | Bon fallback multi-pays |
 | Adzuna | API job search | Optionnel; configure multi-pays mais inactif sans `ADZUNA_APP_ID`/`ADZUNA_APP_KEY` |
 

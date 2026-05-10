@@ -2,9 +2,13 @@ param(
   [string]$ProjectRoot = "C:\Users\Raphael\Documents\JobRadarAI",
   [int]$MaxPerSource = 1200,
   [switch]$Judge,
-  [int]$JudgeLimit = 120,
-  [int]$JudgeBatchSize = 5,
+  [int]$JudgeLimit = 1200,
+  [int]$JudgeBatchSize = 10,
+  [int]$JudgeConcurrency = 1,
   [int]$JudgeTimeoutSeconds = 360,
+  [double]$JudgeMaxFallbackRatio = 0.01,
+  [ValidateSet("auto", "sdk", "raw")]
+  [string]$JudgeTransport = "auto",
   [int]$JudgeMaxAttempts = 3,
   [int]$JudgeRetrySeconds = 30,
   [switch]$JudgeRequired,
@@ -16,10 +20,10 @@ param(
   [int]$HistoryRecheckStaleLimit = 40,
   [switch]$NoSnapshot,
   [int]$LogRetentionDays = 45,
-  [ValidateSet("top", "balanced", "vie", "all")]
-  [string]$JudgeSelectionMode = "balanced",
+  [ValidateSet("top", "balanced", "wide", "vie", "all")]
+  [string]$JudgeSelectionMode = "wide",
   [ValidateSet("none", "minimal", "low", "medium", "high", "xhigh")]
-  [string]$JudgeEffort = "high"
+  [string]$JudgeEffort = "medium"
 )
 
 $ErrorActionPreference = "Stop"
@@ -70,7 +74,7 @@ if ($Judge) {
   for ($attempt = 1; $attempt -le $attempts; $attempt++) {
     "attempt=$attempt/$attempts started=$(Get-Date -Format o)" | Out-File -FilePath $judgeLog -Encoding utf8 -Append
     $judgeAttemptLog = Join-Path $logDir "judge-$stamp-attempt-$attempt.log"
-    $judgeExit = Invoke-LoggedNative -LogFile $judgeAttemptLog -Executable "uv" run --no-project --with-editable . -- python -m jobradai judge --limit $JudgeLimit --batch-size $JudgeBatchSize --selection-mode $JudgeSelectionMode --effort $JudgeEffort --timeout $JudgeTimeoutSeconds
+    $judgeExit = Invoke-LoggedNative -LogFile $judgeAttemptLog -Executable "uv" run --no-project --with-editable . -- python -m jobradai judge --limit $JudgeLimit --batch-size $JudgeBatchSize --concurrency $JudgeConcurrency --selection-mode $JudgeSelectionMode --effort $JudgeEffort --transport $JudgeTransport --timeout $JudgeTimeoutSeconds --max-fallback-ratio $JudgeMaxFallbackRatio
     Get-Content $judgeAttemptLog | Out-File -FilePath $judgeLog -Encoding utf8 -Append
     if ($judgeExit -eq 0) {
       $judgeOk = $true

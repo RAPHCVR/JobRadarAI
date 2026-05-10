@@ -1,12 +1,16 @@
 param(
   [string]$ProjectRoot = "C:\Users\Raphael\Documents\JobRadarAI",
-  [int]$Limit = 120,
-  [int]$BatchSize = 5,
+  [int]$Limit = 1200,
+  [int]$BatchSize = 10,
+  [int]$Concurrency = 1,
   [int]$TimeoutSeconds = 360,
-  [ValidateSet("top", "balanced", "vie", "all")]
-  [string]$SelectionMode = "balanced",
+  [double]$MaxFallbackRatio = 0.01,
+  [ValidateSet("auto", "sdk", "raw")]
+  [string]$Transport = "auto",
+  [ValidateSet("top", "balanced", "wide", "vie", "all")]
+  [string]$SelectionMode = "wide",
   [ValidateSet("none", "minimal", "low", "medium", "high", "xhigh")]
-  [string]$Effort = "high"
+  [string]$Effort = "medium"
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,7 +20,7 @@ Set-Location $ProjectRoot
 $previousErrorActionPreference = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 try {
-  uv run --no-project --with-editable . -- python -m jobradai judge --limit $Limit --batch-size $BatchSize --selection-mode $SelectionMode --effort $Effort --timeout $TimeoutSeconds
+  uv run --no-project --with-editable . -- python -m jobradai judge --limit $Limit --batch-size $BatchSize --concurrency $Concurrency --selection-mode $SelectionMode --effort $Effort --transport $Transport --timeout $TimeoutSeconds --max-fallback-ratio $MaxFallbackRatio
   $judgeExit = $LASTEXITCODE
 } finally {
   $ErrorActionPreference = $previousErrorActionPreference

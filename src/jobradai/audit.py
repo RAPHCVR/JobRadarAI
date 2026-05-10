@@ -172,6 +172,14 @@ def build_audit(
             "available": bool(shortlist),
             "count": int(shortlist.get("count", 0)) if isinstance(shortlist, dict) else 0,
             "batch_count": len(shortlist.get("batches", [])) if isinstance(shortlist, dict) else 0,
+            "concurrency": int(shortlist.get("concurrency", 1)) if isinstance(shortlist, dict) else 1,
+            "transport": shortlist.get("transport", "") if isinstance(shortlist, dict) else "",
+            "endpoint": shortlist.get("endpoint", "") if isinstance(shortlist, dict) else "",
+            "score_weights": shortlist.get("score_weights", {}) if isinstance(shortlist, dict) else {},
+            "quality": shortlist.get("quality", {}) if isinstance(shortlist, dict) else {},
+            "fallback_items": int(shortlist.get("fallback_items", 0) or 0) if isinstance(shortlist, dict) else 0,
+            "fallback_ratio": float(shortlist.get("fallback_ratio", 0) or 0) if isinstance(shortlist, dict) else 0.0,
+            "endpoint_counts": shortlist.get("endpoint_counts", {}) if isinstance(shortlist, dict) else {},
             "selection_mode": shortlist.get("selection_mode", "") if isinstance(shortlist, dict) else "",
             "selection_summary": shortlist.get("selection_summary", {}) if isinstance(shortlist, dict) else {},
             "priority_counts": dict(priority_counts),
@@ -367,7 +375,7 @@ def _restriction_summary(
         "min_score_large": min_score <= 35,
         "business_france_scan_all": bool(config.sources.get("business_france_vie", {}).get("scan_all", False)),
         "business_france_source_large": business_france_count >= 500,
-        "llm_balanced_or_all": llm_mode in {"balanced", "all", "vie"},
+        "llm_balanced_or_all": llm_mode in {"balanced", "wide", "all", "vie"},
         "llm_vie_coverage_ok": int(selection_summary.get("selected_vie", 0) or 0)
         >= min(20, int(selection_summary.get("available_vie", len(vie_jobs)) or 0)),
     }
@@ -498,7 +506,16 @@ def _p_items(
     if not sources:
         items.append({"priority": "P1", "item": "sources.json absent ou illisible: relancer le run complet pour confirmer l'etat des connecteurs."})
     if not shortlist:
-        items.append({"priority": "P1", "item": "Executer le judge LLM balanced pour filtrer les faux positifs et couvrir les VIE/marches cibles."})
+        items.append({"priority": "P1", "item": "Executer le judge LLM wide pour filtrer les faux positifs et couvrir les VIE/marches cibles."})
+    elif int(shortlist.get("fallback_items", 0) or 0) > 0:
+        fallback_ratio = float(shortlist.get("fallback_ratio", 0) or 0)
+        priority = "P1" if fallback_ratio > 0.05 else "P2"
+        items.append(
+            {
+                "priority": priority,
+                "item": f"Verifier le judge LLM: {shortlist.get('fallback_items', 0)} item(s) fallback_default ({fallback_ratio:.1%}). Le run doit rester sous 5%.",
+            }
+        )
     link_summary = _link_check_summary(link_checks)
     if not link_summary["available"]:
         items.append({"priority": "P1", "item": "Executer la verification des liens/apply sur la shortlist avant candidature."})
@@ -614,7 +631,10 @@ def _audit_markdown(report: dict[str, Any]) -> str:
     if llm["available"]:
         selection = llm.get("selection_summary", {})
         lines.append(
-            f"- Offres jugees: **{llm['count']}** | batchs: **{llm['batch_count']}** | priorites: `{llm['priority_counts']}`"
+            f"- Offres jugees: **{llm['count']}** | batchs: **{llm['batch_count']}** | parallele: **{llm.get('concurrency', 1)}** | transport: `{llm.get('transport') or 'n/a'}` | endpoint: `{llm.get('endpoint') or 'n/a'}`"
+        )
+        lines.append(
+            f"- Qualite: fallback **{llm.get('fallback_items', 0)}** / **{llm['count']}** ({llm.get('fallback_ratio', 0):.1%}) | endpoints: `{llm.get('endpoint_counts', {})}` | poids score: `{llm.get('score_weights', {})}` | priorites: `{llm['priority_counts']}`"
         )
         lines.append(
             f"- Selection: `{llm.get('selection_mode') or 'n/a'}` | VIE selectionnes: **{selection.get('selected_vie', 0)}** / **{selection.get('available_vie', 0)}** | corpus juge: **{selection.get('selected_jobs', llm['count'])}** / **{selection.get('available_jobs', report['total_jobs'])}**"

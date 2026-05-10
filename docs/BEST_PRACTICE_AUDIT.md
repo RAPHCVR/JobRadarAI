@@ -1,6 +1,6 @@
 # Audit Best Practice
 
-Derniere mise a jour: **2026-05-09**.
+Derniere mise a jour: **2026-05-10**.
 
 ## Verdict
 
@@ -17,21 +17,24 @@ Une interface web privee est aussi deployee sous `https://jobs.raphcvr.me` pour 
 
 ## Etat Runtime Valide
 
-Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
+Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**.
 
-- 4976 offres retenues.
+- 5493 offres retenues.
 - 58 sources OK.
 - 2 skips attendus: Adzuna sans credentials, JobSpy API local injoignable.
 - 0 erreur source.
-- 532 VIE retenus.
-- 200 offres jugees par le LLM en `balanced`.
-- 236 liens verifies en mode priority-aware.
-- Snapshot: `runs/history/20260509-192018`.
+- 509 VIE retenus.
+- 1200 offres jugees par le LLM en `wide`, effort `medium`, batch 10, concurrence 1.
+- Qualite LLM: 0 `fallback_default` / 1200, transport `auto` via OpenAI SDK + `base_url` codexlb, fallback REST controle.
+- 555 liens verifies en mode priority-aware.
+- Snapshot: `runs/history/20260510-173933`.
 - Registre multi-run: `runs/history/job_history.sqlite`.
-- Queue dedupee: `runs/latest/application_queue.md`, 181 items apres durcissement `too_senior`/signaux structures.
-- Historique: 674 nouvelles offres, 1 revenue, 1184 absentes marquees `stale`, 0 `expired`.
+- Queue dedupee: `runs/latest/application_queue.md`, 300 items actifs apres rebaseline fresh.
+- Historique: 5493 offres courantes, 5493 connues, 0 absente/stale/expired dans le ledger fresh.
+- Audit dedupe 2026-05-09: le gros ecart apparent venait surtout du cumul `stale` et d'un churn Jooble cause par des parametres d'URL volatils; les IDs stables canonisent maintenant les liens Jooble.
+- Audit sources 2026-05-10: les autres sources a delta ou zero count ont ete verifiees. Aucun autre faux-churn d'ID detecte; Jobicy avait seulement une strategie tag trop stricte et utilise maintenant un fallback global filtre localement. GermanTechJobs n'etait pas casse, mais le cap RSS `400` etait trop bas pour un flux live >2000 items; il passe a `1200`. France Travail pagine maintenant `3 x 50` resultats par requete et inclut `data scientist`/France data/MDM; smoke live apres correctif: **1231** IDs uniques, **10/10** anciennes absentes retrouvees, **189** offres >= 60 de score.
 - P0: aucun blocage runtime detecte.
-- Plateforme web: `jobradarai-web` Running 1/1 sur Kubernetes, ingress `jobs.raphcvr.me`, login HTTPS OK, queue `181`, CV PDF disponible.
+- Plateforme web: `jobradarai-web` Running 1/1 sur Kubernetes, ingress `jobs.raphcvr.me`, HTTPS `/api/health` OK, PVC synchronise avec `run_name=20260510-173933`, `queue_count=300`, `llm_count=1200`.
 
 ## Repos Et Systemes Audites
 
@@ -46,8 +49,8 @@ Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
 
 - France Travail: actif et revalide en live, meilleur socle France.
 - Business France VIE: actif sans cle via l'API officielle Mon Volontariat International.
-- Le Forem Open Data: actif sans cle via ODWB/Opendatasoft; apporte Wallonie-Bruxelles et une couverture partielle VDAB traduite.
-- Actiris: actif sans cle via endpoint JSON du site officiel.
+- Le Forem Open Data: actif sans cle via ODWB/Opendatasoft; apporte Wallonie-Bruxelles et une couverture partielle VDAB traduite; requetes elargies a `Data Analyst`/`Data Quality Analyst` apres audit des absentes live.
+- Actiris: actif sans cle via endpoint JSON du site officiel; requetes elargies a `Data Analyst`/`Data Quality Analyst`.
 - Bundesagentur Jobsuche: actif sans cle, source officielle Allemagne + Autriche, filtree par pays pour eviter de melanger `Deutschland` et `Österreich`.
 - JobTechDev Sweden: actif sans cle, source officielle Suede.
 - NAV Arbeidsplassen Norway: actif sans cle via endpoint public de recherche; le feed NAV tokenise n'est pas necessaire pour la decouverte.
@@ -64,7 +67,7 @@ Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
 - SerpAPI Google Jobs: desactive volontairement; quota trop faible.
 - VDAB: desactive volontairement; acces public/partenaire bloque, pas une action restante.
 - Adzuna: configure en option multi-pays, mais inactif sans credentials. A activer seulement si les cles sont disponibles et si le ratio signal/bruit est bon au smoke.
-- LLM judge OpenAI-compatible: implemente avec `gpt-5.4-mini`; le run quotidien peut utiliser `high`, et le run large valide a utilise `medium` + batchs de 5 pour rester stable sur 200 offres.
+- LLM judge OpenAI-compatible: implemente avec `gpt-5.4-mini`; le mode valide est `wide` + `JudgeLimit 1200` + batch 10 + concurrence 1 + effort `medium` + transport `auto`. Le chemin prod utilise l'OpenAI Python SDK avec `base_url` codexlb quand disponible, sortie JSON Schema stricte, fallback REST controle et quality gate. Le score final est LLM-majoritaire (`40%` local, `60%` LLM) pour laisser le judge dominer le reranking tout en gardant un garde-fou explicable.
 
 ## Garde-Fous Mis En Place
 
@@ -97,7 +100,8 @@ Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
 - Le scoring expose `doctoral_scope`: bonus leger pour CIFRE/industrial PhD, penalite explicite pour doctorat academique sans salaire/entreprise clair. Cela garde les PhD utiles visibles sans les laisser depasser les jobs/VIE/graduate mieux alignes.
 - Les salaires non EUR sont normalises en estimation annuelle EUR pour le tri, sans masquer la devise d'origine.
 - Les remote US-only/localisation incompatible sont penalises; les cas `restricted` restent en verification humaine.
-- Le judge LLM logge la progression par batch et `run_daily.ps1` expose `-JudgeTimeoutSeconds`; pour un run ponctuel large, `JudgeLimit 200` + `JudgeEffort medium` est plus stable que `high` sur le gateway actuel.
+- Le judge LLM logge la progression par batch et `run_daily.ps1` expose `-JudgeTimeoutSeconds`/`-JudgeConcurrency`/`-JudgeTransport`/`-JudgeMaxFallbackRatio`. Le calibrage codexlb actuel montre que concurrence 1 est le default prod; concurrence 2 est plus lente au smoke et concurrence 5 peut saturer la file `responses session bridge`. Batch 10 est le compromis valide; batch 20 a ete plus lent et a degrade le transport.
+- Le judge supprime les anciennes shortlists avant execution et echoue si le taux de `fallback_default` depasse le seuil configure; le rebaseline 2026-05-10 a ete lance avec seuil strict 0 et a termine a 0/1200.
 - Les exports CSV neutralisent les formules Excel et le dashboard n'accepte que des liens HTTP(S).
 - Les erreurs HTTP redigent secrets en query/path/body.
 - LinkedIn non automatise en masse.
@@ -108,8 +112,8 @@ Dernier full run complet valide documente: **2026-05-09 19:59 Europe/Paris**.
 ## Reste A Faire
 
 - `P0`: aucun blocage runtime detecte sur le dernier run complet.
-- `P1`: verifier manuellement les 91 liens `browser_required` avant candidature, surtout Indeed/JobSpy et pages protegees/anti-bot.
-- `P1`: verifier manuellement les 15 liens `needs_review/server_error` avant candidature.
+- `P1`: verifier manuellement les 206 liens `browser_required` avant candidature, surtout Indeed/JobSpy et pages protegees/anti-bot.
+- `P1`: verifier manuellement les 42 liens `needs_review` et le 1 `server_error` avant candidature.
 - `P1`: verifier manuellement salaire et remote quand l'offre ne publie pas l'information ou quand le LLM marque `unknown`/`weak`.
 - `P2`: confirmer avec RH les dates de demarrage `unknown`/`too_soon`; ne pas filtrer automatiquement sur ce signal.
 - `P2`: traiter `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux de tri et de verification; `too_senior` doit rester hors queue actionnable sauf override LLM junior/all-levels explicite.
