@@ -2,7 +2,7 @@
 
 Derniere validation run: **2026-05-10 20:00 Europe/Paris**, full rebaseline manuel `20260510-173933` conserve, puis regeneration queue/history/audit apres correctif VIE.
 
-Derniere validation plateforme web: **2026-05-10 19:32 Europe/Paris**, image `ghcr.io/raphcvr/jobradarai-web:sha-0014aed` deployee et `runs/latest` synchronise sur Kubernetes sous `https://jobs.raphcvr.me`.
+Derniere validation plateforme web: **2026-05-10 20:07 Europe/Paris**, image `ghcr.io/raphcvr/jobradarai-web:sha-5ca3919` deployee et `runs/latest` synchronise sur Kubernetes sous `https://jobs.raphcvr.me`.
 
 Commande utilisee pour la base large:
 
@@ -37,7 +37,7 @@ Commande utilisee pour la base large:
 - Snapshot final: `runs/history/20260510-173933-vie-fix`.
 - Registre multi-run: `runs/history/job_history.sqlite`, fresh rebaseline, **5493** offres connues, **0** missing/stale/expired au demarrage.
 - Tache Windows: `JobRadarAI-Daily` **desactivee**.
-- Plateforme web: pod `jobradarai-web` **Running 1/1**, image `sha-0014aed`, HTTPS `/api/health` OK, PVC synchronise avec `run_name=20260510-173933`, `queue_count=300`, `llm_count=1200`.
+- Plateforme web: pod `jobradarai-web` **Running 1/1**, image `sha-5ca3919`, HTTPS `/api/health` OK, PVC synchronise avec `run_name=20260510-173933`, `queue_count=300`, `vie_queue_count=240`, `llm_count=1200`.
 
 Exports principaux:
 
