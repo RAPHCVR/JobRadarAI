@@ -24,7 +24,7 @@ Le projet est volontairement local et humain-dans-la-boucle:
 
 ## Etat Court
 
-Dernier full run valide documente: **2026-05-10 19:26 Europe/Paris**.
+Dernier full run valide documente: **2026-05-10 19:26 Europe/Paris**. Derniere regeneration queue/audit: **2026-05-10 20:00 Europe/Paris**.
 
 - 5493 offres retenues.
 - 58 sources OK, 2 sources ignorees attendues, 0 erreur.
@@ -32,7 +32,8 @@ Dernier full run valide documente: **2026-05-10 19:26 Europe/Paris**.
 - 1200 offres jugees par le LLM en mode `wide`, effort `medium`, batch 10, concurrence 1.
 - Quality gate LLM stricte: 0 `fallback_default` / 1200; transport `auto` via OpenAI SDK + `base_url` codexlb, fallback REST controle.
 - 555 liens verifies en mode priority-aware.
-- 300 items dans la queue multi-run dedupee.
+- 300 items dans la queue multi-run dedupee, triee par priorite LLM puis `COALESCE(last_combined_score, score)`.
+- 240 missions dans `vie_priority_queue.md/json`, dont 77 deja jugees LLM et 163 VIE techniques non jugees a garder en veille.
 - Tache Windows `JobRadarAI-Daily`: **desactivee**.
 
 Le full run inclut les extensions ajoutees pendant l'audit: Bundesagentur Jobsuche, SmartRecruiters durci, Delivery Hero filtre, correction du matching marche par alias bornes, JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS, Doctorat.gouv.fr, AcademicTransfer, WeWorkRemotely RSS, SwissDevJobs, GermanTechJobs, champs structures `deadline`/`language_check`/`remote_location_validity`/`required_years`/`experience_check`/salaire annualise EUR, extension graduate/early-career/doctorat industriel-CIFRE, et extension opportuniste Autriche/Nordics/Espagne/Portugal/Estonie/Pologne/Tchequie.
@@ -109,6 +110,7 @@ Pour rapatrier les statuts/notes saisis dans l'interface:
 - `scripts/run_daily.ps1`: orchestration run + judge + link-check + historique + audit + snapshot.
 - `runs/latest/`: exports du dernier run, ignore par git.
 - `runs/history/job_history.sqlite`: ledger multi-run, ignore par git.
+- `runs/latest/vie_priority_queue.md`: lane VIE separee pour ne pas comparer une indemnite VIE a un brut CDI.
 
 Les credentials restent dans `config/.env` ou variables d'environnement, jamais dans le code.
 
@@ -127,6 +129,7 @@ Voir [docs/SOURCES.md](docs/SOURCES.md) pour le detail.
 - Les sources officielles/ATS priment sur les scrapers.
 - Les exports gardent les raisons de scoring.
 - `start_date_check` reste un signal soft: confirmer avec RH, ne pas auto-skipper.
+- Les VIE sont exposees dans une lane dediee; la queue principale reste CDI/VIE mixte mais n'est plus le seul endroit ou regarder les VIE.
 - `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et la normalisation devise/salaire sont des signaux de priorisation, pas des hard filters aveugles; seul `experience_check=too_senior` deterministe sort de la queue actionnable sauf override LLM `junior_ok`.
 - Les offres PhD/doctorat sont opportunistes: un CIFRE/industrial PhD data/AI/R&D peut etre shortlist, mais un doctorat academique sans entreprise, salaire ou fit technique clair reste a verifier ou low-fit.
 - Le judge LLM passe par l'OpenAI SDK en mode `auto` quand disponible, avec `base_url` custom codexlb, sortie JSON Schema stricte, fallback REST controle et quality gate: un run avec trop de `fallback_default` echoue au lieu de polluer la queue.

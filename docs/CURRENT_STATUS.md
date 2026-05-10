@@ -1,6 +1,6 @@
 # Etat Courant
 
-Derniere validation run: **2026-05-10 19:26 Europe/Paris**, full rebaseline manuel `20260510-173933` apres correction du transport LLM, quality gate stricte et ledger remis a zero.
+Derniere validation run: **2026-05-10 20:00 Europe/Paris**, full rebaseline manuel `20260510-173933` conserve, puis regeneration queue/history/audit apres correctif VIE.
 
 Derniere validation plateforme web: **2026-05-10 19:32 Europe/Paris**, image `ghcr.io/raphcvr/jobradarai-web:sha-0014aed` deployee et `runs/latest` synchronise sur Kubernetes sous `https://jobs.raphcvr.me`.
 
@@ -32,8 +32,9 @@ Commande utilisee pour la base large:
 - Qualite LLM: **0 fallback_default / 1200**, quality gate stricte `-JudgeMaxFallbackRatio 0`.
 - Endpoints LLM: **117** batchs `responses_sdk`, **4** batchs fallback REST `responses`, aucun fallback de jugement.
 - Verification liens: **555** liens verifies.
-- Queue multi-run: **300** items dedupes, tous `active`.
-- Snapshot final: `runs/history/20260510-173933`.
+- Queue multi-run: **300** items dedupes, tous `active`, triee par priorite LLM puis `COALESCE(last_combined_score, score)`.
+- Lane VIE dediee: **240** missions priorisees, dont **77** deja jugees LLM et **163** VIE techniques non jugees.
+- Snapshot final: `runs/history/20260510-173933-vie-fix`.
 - Registre multi-run: `runs/history/job_history.sqlite`, fresh rebaseline, **5493** offres connues, **0** missing/stale/expired au demarrage.
 - Tache Windows: `JobRadarAI-Daily` **desactivee**.
 - Plateforme web: pod `jobradarai-web` **Running 1/1**, image `sha-0014aed`, HTTPS `/api/health` OK, PVC synchronise avec `run_name=20260510-173933`, `queue_count=300`, `llm_count=1200`.
@@ -46,6 +47,7 @@ Exports principaux:
 - Digest graduate/early-career/doctoral: `runs/latest/graduate_programs.md`.
 - Verification liens: `runs/latest/link_checks.md`.
 - Queue multi-run: `runs/latest/application_queue.md`.
+- Lane VIE dediee: `runs/latest/vie_priority_queue.md`.
 - Messages RH brouillons: `runs/latest/application_messages.md`.
 - Dashboard historique: `runs/latest/history_dashboard.md`.
 - Weekly digest: `runs/latest/weekly_digest.md`.
@@ -101,7 +103,7 @@ Sources volontairement hors routine:
 - Luxembourg: **33**.
 - Estonie: **2**.
 
-Verdict restrictivite: **OK**. Le seuil local reste bas (`min_score = 35`), Business France VIE scanne large, `max_per_source = 1200`, et le tri final est fait par score + LLM plutot que par hard filters trop agressifs.
+Verdict restrictivite: **OK**. Le seuil local reste bas (`min_score = 35`), Business France VIE scanne large, `max_per_source = 1200`, et le tri final est fait par priorite LLM + score combine plutot que par hard filters trop agressifs.
 
 Bandes de score:
 
@@ -138,17 +140,19 @@ Top `apply_now` du run:
 - Queue dedupee: **300**.
 - Statuts: **300** `active`, **0** `stale`, **0** `expired` dans la queue.
 - Priorites queue: **42** `apply_now`, **258** `shortlist`.
-- Liens queue: **147** `direct_ok`, **120** `browser_required`, **33** `needs_review`.
-- Niveau LLM: **102** `junior_ok`, **173** `stretch`, **25** `unknown`, **0** `too_senior`.
-- Experience deterministe dans la queue: **13** `junior_ok`, **24** `stretch`, **263** `unknown`, **0** `too_senior`; **25** items exposent `required_years`.
+- VIE dans la queue principale: **17**.
+- Lane VIE dediee: **240** items, buckets **2** `apply_now`, **27** `shortlist`, **48** `maybe`, **163** `unjudged_technical`.
+- Liens queue: **151** `direct_ok`, **116** `browser_required`, **33** `needs_review`.
+- Niveau LLM: **114** `junior_ok`, **162** `stretch`, **24** `unknown`, **0** `too_senior`.
+- Experience deterministe dans la queue: **21** `junior_ok`, **22** `stretch`, **257** `unknown`, **0** `too_senior`; **23** items exposent `required_years`.
 
 Checks queue:
 
-- `start_date_check`: 279 `unknown`, 13 `too_soon`, 8 `compatible`.
-- Salaire: 137 `meets_or_likely`, 118 `unknown`, 45 `below_min`.
-- Remote: 89 `meets`, 205 `weak`, 6 `unknown`.
-- Langue: 66 `english_ok`, 28 `french_ok`, 13 `local_language_required`, 193 `unknown`.
-- Remote/localisation: 293 `compatible`, 7 `restricted`, 0 `incompatible`.
+- `start_date_check`: 274 `unknown`, 14 `too_soon`, 12 `compatible`.
+- Salaire: 141 `meets_or_likely`, 114 `unknown`, 45 `below_min`.
+- Remote: 88 `meets`, 207 `weak`, 5 `unknown`.
+- Langue: 71 `english_ok`, 26 `french_ok`, 12 `local_language_required`, 191 `unknown`.
+- Remote/localisation: 292 `compatible`, 8 `restricted`, 0 `incompatible`.
 
 ## Liens
 
@@ -205,6 +209,7 @@ Verdict: la couche marche et reste correctement secondaire. Elle capture les gra
 - `P1`: verifier manuellement les **42** liens `needs_review` et le **1** `server_error` avant candidature.
 - `P1`: verifier salaire et remote quand l'offre ou le judge LLM marquent `unknown`/`weak`.
 - `P2`: utiliser `start_date_check` comme signal soft et confirmer avec RH les dates `unknown`/`too_soon`; ne pas auto-skipper.
+- `P2`: exploiter `vie_priority_queue.md` pour les VIE; la queue principale ne suffit pas a elle seule pour cette voie.
 - `P2`: utiliser `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux soft. Les hard filters legitimes restent: remote explicitement incompatible, langue locale obligatoire non compensee par un fit tres fort, ou niveau/experience `too_senior` sans signal junior/all-levels explicite.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
 - `P2`: lancer ponctuellement `scripts/pull_web_state.ps1` pour sauvegarder localement les statuts/notes saisis dans l'interface.

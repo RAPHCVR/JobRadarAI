@@ -4,7 +4,7 @@
 
 | Source | Type | Usage |
 |---|---|---|
-| Business France VIE | API officielle publique | Missions VIE a l'etranger via Mon Volontariat International; scan pagine large puis tri score/LLM |
+| Business France VIE | API officielle publique | Missions VIE a l'etranger via Mon Volontariat International; scan pagine large, tri score/LLM et lane VIE dediee |
 | Le Forem Open Data | API open data officielle | Offres Forem/partenaires Wallonie-Bruxelles, avec une partie des offres VDAB traduites en francais; 24 termes dont data analyst/data quality |
 | Actiris | Endpoint JSON public du site officiel | Offres Bruxelles/Belgique, requetes limitees et filtre local; 24 termes dont data analyst/data quality |
 | Bundesagentur Jobsuche | API publique officielle | Allemagne + Autriche data/AI/LLM, filtree par pays pour distinguer `Deutschland` et `Österreich` |
@@ -105,6 +105,8 @@ Le pipeline enrichit maintenant les offres avec des champs de decision lisibles 
 OpenAI a un `timeout = 90` dans `config/sources.toml`, car son feed Ashby officiel est volumineux et peut repondre au-dela du timeout HTTP global.
 
 Les gros boards globaux et Business France VIE sont volontairement capes haut dans `scripts/run_daily.ps1` pour ne pas perdre les roles Europe/Irlande/Singapour/VIE apres tri.
+
+Business France VIE a une sortie dediee `runs/latest/vie_priority_queue.md`: elle melange VIE deja jugees par le LLM et VIE techniques non jugees, parce qu'une indemnite VIE ne doit pas etre comparee directement a un brut CDI.
 
 ## Extensions Candidates
 

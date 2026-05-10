@@ -188,6 +188,7 @@ class WebDataStore:
             "new_jobs": queue.get("new_jobs", 0),
             "missing_this_run": queue.get("missing_this_run", 0),
             "queue_count": len(jobs),
+            "vie_queue_count": int(queue.get("vie_queue_count", 0) or 0),
             "queue_status_counts": dict(Counter(str(job.get("presence_status") or "unknown") for job in jobs)),
             "queue_bucket_counts": dict(Counter(str(job.get("queue_bucket") or "unknown") for job in jobs)),
             "application_status_counts": dict(Counter(str(job.get("application_status") or "to_review") for job in jobs)),
@@ -204,6 +205,7 @@ class WebDataStore:
             "links": {
                 "dashboard": "/api/file/dashboard.html",
                 "queue_markdown": "/api/file/application_queue.md",
+                "vie_queue_markdown": "/api/file/vie_priority_queue.md",
                 "messages_markdown": "/api/file/application_messages.md",
                 "audit_markdown": "/api/file/audit.md",
                 "link_checks_markdown": "/api/file/link_checks.md",
@@ -288,6 +290,7 @@ class WebDataStore:
     def output_file(self, name: str) -> Path | None:
         allowed = {
             "application_queue.md",
+            "vie_priority_queue.md",
             "application_messages.md",
             "dashboard.html",
             "llm_shortlist.md",

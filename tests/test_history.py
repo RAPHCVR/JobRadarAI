@@ -160,6 +160,42 @@ class HistoryTests(unittest.TestCase):
             self.assertNotIn("n/ay", messages_md)
             self.assertIn("exp `unknown`/n/a |", queue_md)
 
+    def test_sync_history_ranks_queue_by_combined_score_within_priority(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "latest"
+            output.mkdir()
+            history_db = root / "history" / "job_history.sqlite"
+            local_high = Job(
+                source="ATS",
+                source_type="ats",
+                title="Data Platform Engineer",
+                company="Local High",
+                url="https://jobs.example.com/local-high",
+                market="france",
+                score=95,
+            ).as_dict()
+            llm_high = Job(
+                source="ATS",
+                source_type="ats",
+                title="Applied AI Engineer",
+                company="LLM High",
+                url="https://jobs.example.com/llm-high",
+                market="ireland",
+                score=50,
+            ).as_dict()
+            self._write_run(
+                output,
+                [local_high, llm_high],
+                shortlist_items=[
+                    {"stable_id": local_high["stable_id"], "priority": "shortlist", "combined_score": 60},
+                    {"stable_id": llm_high["stable_id"], "priority": "shortlist", "combined_score": 90},
+                ],
+            )
+            result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
+            self.assertEqual(result["items"][0]["stable_id"], llm_high["stable_id"])
+            self.assertEqual(result["items"][0]["ranking_score"], 90)
+
     def test_sync_history_excludes_too_senior_items_from_queue(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -288,6 +324,59 @@ class HistoryTests(unittest.TestCase):
             )
             result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
             self.assertTrue(any(item["stable_id"] == job["stable_id"] for item in result["items"]))
+
+    def test_sync_history_writes_dedicated_vie_priority_queue(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "latest"
+            output.mkdir()
+            history_db = root / "history" / "job_history.sqlite"
+            judged_vie = Job(
+                source="Business France VIE",
+                source_type="official_api",
+                title="Data Analyst - Strategic Partnerships",
+                company="Flash",
+                url="https://mon-vie-via.businessfrance.fr/offres/data-analyst",
+                market="spain",
+                location="Barcelone",
+                salary="Indemnite VIE mensuelle 2676.00 EUR",
+                employment_type="VIE 12 mois",
+                score=54,
+            ).as_dict()
+            unjudged_vie = Job(
+                source="Business France VIE",
+                source_type="official_api",
+                title="Data Management & Analytical Method Lifecycle",
+                company="Baxter",
+                url="https://mon-vie-via.businessfrance.fr/offres/data-management",
+                market="belgium",
+                location="Belgique",
+                salary="Indemnite VIE mensuelle 2955.00 EUR",
+                employment_type="VIE 12 mois",
+                description="Data management, analytical method lifecycle and automation tooling.",
+                score=48,
+            ).as_dict()
+            self._write_run(
+                output,
+                [judged_vie, unjudged_vie],
+                shortlist_items=[
+                    {
+                        "stable_id": judged_vie["stable_id"],
+                        "priority": "shortlist",
+                        "combined_score": 72,
+                        "level_fit": "junior_ok",
+                    }
+                ],
+            )
+            result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
+            self.assertEqual(result["vie_queue_count"], 2)
+            buckets = {item["stable_id"]: item["vie_bucket"] for item in result["vie_items"]}
+            self.assertEqual(buckets[judged_vie["stable_id"]], "shortlist")
+            self.assertEqual(buckets[unjudged_vie["stable_id"]], "unjudged_technical")
+            self.assertTrue((output / "vie_priority_queue.md").exists())
+            vie_md = (output / "vie_priority_queue.md").read_text(encoding="utf-8")
+            self.assertIn("Data Analyst - Strategic Partnerships", vie_md)
+            self.assertIn("Data Management & Analytical Method Lifecycle", vie_md)
 
     def _write_run(self, output: Path, jobs: list[dict], shortlist_items: list[dict]) -> None:
         (output / "jobs.json").write_text(json.dumps(jobs, ensure_ascii=False), encoding="utf-8")

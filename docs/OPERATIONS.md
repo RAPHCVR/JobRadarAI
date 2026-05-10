@@ -32,6 +32,7 @@ Ce run genere:
 - `runs/latest/llm_shortlist.md` et `.json` si `-Judge` est actif
 - `runs/latest/link_checks.md` et `.json`
 - `runs/latest/application_queue.md` et `.json`
+- `runs/latest/vie_priority_queue.md` et `.json`
 - `runs/latest/application_messages.md` et `.json`
 - `runs/latest/history_dashboard.md` et `.json`
 - `runs/latest/weekly_digest.md` et `.json`
@@ -63,7 +64,8 @@ Le registre multi-run est actif par defaut:
 - `-HistoryRecheckStaleLimit 40` reverifie les anciennes offres pertinentes absentes du run courant.
 - `runs/latest/jobs.sqlite` reste le snapshot courant strict.
 - `runs/history/job_history.sqlite` conserve l'historique dedupe avec `active`, `stale` et `expired`.
-- `runs/latest/application_queue.md` concatene les offres pertinentes anciennes et nouvelles, dedupees.
+- `runs/latest/application_queue.md` concatene les offres pertinentes anciennes et nouvelles, dedupees. Elle trie par priorite LLM puis `COALESCE(last_combined_score, score)`, afin qu'un bon jugement LLM ne soit pas noye par un score local moyen.
+- `runs/latest/vie_priority_queue.md` expose une lane VIE separee: VIE `apply_now`/`shortlist`/`maybe`, plus VIE techniques non jugees ou a indemnite forte. C'est le bon fichier pour arbitrer les VIE car l'indemnite mensuelle et la fiscalite ne sont pas comparables a un brut CDI.
 - `runs/latest/application_messages.md` prepare des messages RH brouillons pour candidature manuelle.
 - `runs/latest/history_dashboard.md` et `weekly_digest.md` comparent le run courant au precedent: nouvelles, revenues, disparues, stale et expirees.
 
@@ -163,12 +165,13 @@ JobSpy Direct est un fallback Indeed controle. Il est borne par `jobspy_direct.t
 2. Lire `runs/latest/llm_shortlist.md` pour la shortlist finale.
 3. Lire `runs/latest/graduate_programs.md` si tu veux verifier les graduate programmes/new-grad/CIFRE sans en faire le filtre principal.
 4. Lire `runs/latest/application_queue.md` pour la queue dedupee multi-run.
-5. Lire `runs/latest/application_messages.md` pour les brouillons RH a valider manuellement.
-6. Lire `runs/latest/link_checks.md` avant de candidater.
-7. Lire `runs/latest/history_dashboard.md` ou `weekly_digest.md` pour comparer au run precedent.
-8. Lire `runs/latest/audit.md` pour marche/langues/VIE/remote/salaire et P0/P1/P2.
-9. Importer `runs/latest/jobs.csv` dans Excel si besoin.
-10. Utiliser `runs/latest/jobs.sqlite` pour le run courant, ou `runs/history/job_history.sqlite` pour l'historique.
+5. Lire `runs/latest/vie_priority_queue.md` pour la lane VIE dediee.
+6. Lire `runs/latest/application_messages.md` pour les brouillons RH a valider manuellement.
+7. Lire `runs/latest/link_checks.md` avant de candidater.
+8. Lire `runs/latest/history_dashboard.md` ou `weekly_digest.md` pour comparer au run precedent.
+9. Lire `runs/latest/audit.md` pour marche/langues/VIE/remote/salaire et P0/P1/P2.
+10. Importer `runs/latest/jobs.csv` dans Excel si besoin.
+11. Utiliser `runs/latest/jobs.sqlite` pour le run courant, ou `runs/history/job_history.sqlite` pour l'historique.
 
 ## Exemple SQL
 

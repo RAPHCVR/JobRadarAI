@@ -223,8 +223,11 @@ def _application_queue_summary(application_queue: dict[str, Any]) -> dict[str, A
     return {
         "available": True,
         "queue_count": int(application_queue.get("queue_count", len(items)) or 0),
+        "vie_queue_count": int(application_queue.get("vie_queue_count", 0) or 0),
         "status_counts": application_queue.get("queue_status_counts", {}),
         "priority_counts": application_queue.get("queue_priority_counts", {}),
+        "vie_bucket_counts": application_queue.get("vie_queue_bucket_counts", {}),
+        "vie_llm_counts": application_queue.get("vie_queue_llm_counts", {}),
         "start_date_counts": dict(Counter(str(item.get("last_start_date_check") or "unknown") for item in items)),
         "salary_counts": dict(Counter(str(item.get("last_salary_check") or "unknown") for item in items)),
         "remote_counts": dict(Counter(str(item.get("last_remote_check") or "unknown") for item in items)),
@@ -296,6 +299,7 @@ def _history_dashboard_summary(history_dashboard: dict[str, Any]) -> dict[str, A
         "stale_jobs",
         "expired_jobs",
         "queue_count",
+        "vie_queue_count",
         "deltas_vs_previous",
     ]
     return {"available": True, **{key: history_dashboard.get(key) for key in keys}}
@@ -381,7 +385,7 @@ def _restriction_summary(
     }
     blocking = [name for name, ok in checks.items() if not ok]
     verdict = (
-        "OK: corpus large, VIE scanne largement, seuil local bas, tri final confie au LLM."
+        "OK: corpus large, VIE scanne largement, seuil local bas, tri final confie au LLM avec lane VIE dediee."
         if not blocking
         else "A surveiller: " + ", ".join(blocking)
     )
@@ -669,6 +673,9 @@ def _audit_markdown(report: dict[str, Any]) -> str:
     if queue["available"]:
         lines.append(
             f"- Queue dedupee: **{queue['queue_count']}** | priorites: `{queue.get('priority_counts', {})}` | statuts: `{queue.get('status_counts', {})}`"
+        )
+        lines.append(
+            f"- Lane VIE dediee: **{queue.get('vie_queue_count', 0)}** | buckets: `{queue.get('vie_bucket_counts', {})}` | LLM: `{queue.get('vie_llm_counts', {})}`"
         )
         lines.append(
             f"- Checks queue: start `{queue.get('start_date_counts', {})}` | salaire `{queue.get('salary_counts', {})}` | remote `{queue.get('remote_counts', {})}` | langue `{queue.get('language_counts', {})}` | remote/localisation `{queue.get('remote_location_counts', {})}`"

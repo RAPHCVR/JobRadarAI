@@ -17,7 +17,7 @@ Une interface web privee est aussi deployee sous `https://jobs.raphcvr.me` pour 
 
 ## Etat Runtime Valide
 
-Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**.
+Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**. Queue/history/audit regeneres apres correctif VIE le **2026-05-10 20:00 Europe/Paris**.
 
 - 5493 offres retenues.
 - 58 sources OK.
@@ -27,9 +27,10 @@ Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**.
 - 1200 offres jugees par le LLM en `wide`, effort `medium`, batch 10, concurrence 1.
 - Qualite LLM: 0 `fallback_default` / 1200, transport `auto` via OpenAI SDK + `base_url` codexlb, fallback REST controle.
 - 555 liens verifies en mode priority-aware.
-- Snapshot: `runs/history/20260510-173933`.
+- Snapshot: `runs/history/20260510-173933-vie-fix`.
 - Registre multi-run: `runs/history/job_history.sqlite`.
-- Queue dedupee: `runs/latest/application_queue.md`, 300 items actifs apres rebaseline fresh.
+- Queue dedupee: `runs/latest/application_queue.md`, 300 items actifs apres rebaseline fresh, triee par priorite LLM puis `COALESCE(last_combined_score, score)`.
+- Lane VIE dediee: `runs/latest/vie_priority_queue.md`, 240 missions priorisees dont 77 deja jugees LLM et 163 VIE techniques non jugees.
 - Historique: 5493 offres courantes, 5493 connues, 0 absente/stale/expired dans le ledger fresh.
 - Audit dedupe 2026-05-09: le gros ecart apparent venait surtout du cumul `stale` et d'un churn Jooble cause par des parametres d'URL volatils; les IDs stables canonisent maintenant les liens Jooble.
 - Audit sources 2026-05-10: les autres sources a delta ou zero count ont ete verifiees. Aucun autre faux-churn d'ID detecte; Jobicy avait seulement une strategie tag trop stricte et utilise maintenant un fallback global filtre localement. GermanTechJobs n'etait pas casse, mais le cap RSS `400` etait trop bas pour un flux live >2000 items; il passe a `1200`. France Travail pagine maintenant `3 x 50` resultats par requete et inclut `data scientist`/France data/MDM; smoke live apres correctif: **1231** IDs uniques, **10/10** anciennes absentes retrouvees, **189** offres >= 60 de score.
@@ -82,7 +83,7 @@ Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**.
 - Requetes sources FR/EN: `Ingénieur IA`, `Ingénieur Data`, `Machine Learning Engineer`, `ML Engineer`, `AI Research Engineer`, `LLM Application Engineer`, `Data Scientist`.
 - Veille niche ajoutee sans durcir le tri: `Analytics Engineer`, `Applied Scientist`, `Interpretability Engineer`, `Explainability Engineer`, `AI Safety Engineer`, `Knowledge Graph Engineer`, `Semantic Web Engineer`; ces termes restent sous garde-fous niveau/experience/salaire/langue.
 - JobSpy Direct ne supprime plus les roles junior/graduate; seulement les stages/alternances non cibles.
-- Business France VIE scanne largement l'API officielle paginee; le tri metier se fait par score + LLM.
+- Business France VIE scanne largement l'API officielle paginee; le tri metier se fait par score combine LLM-majoritaire et lane VIE separee.
 - Forem et Actiris appliquent un filtre local minimal apres recherche source pour garder les signaux data/IA/LLM/research.
 - Tokenisation scoring multi-mots: `distributed systems`, `data quality`, `GitHub Actions`, `Azure DevOps`, etc.
 - Seuil local a 35 pour garder un corpus de revue large; shortlist finale par judge LLM et priorites explicites.
@@ -94,7 +95,7 @@ Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**.
 - Le script quotidien retente le judge, verifie les liens, regenere l'audit et snapshotte le resultat.
 - Le script quotidien synchronise un ledger multi-run dedupe entre les liens et l'audit.
 - `runs/latest/jobs.sqlite` reste un snapshot du run courant; les offres pertinentes anciennes sont conservees dans `runs/history/job_history.sqlite` avec `first_seen`, `last_seen`, `seen_count`, `absent_count`, `presence_status`, dernier statut lien et derniere priorite LLM.
-- La queue expose `start_date_check = compatible | too_soon | unknown` comme signal soft, plus `application_messages.md`, `history_dashboard.md` et `weekly_digest.md`.
+- La queue expose `start_date_check = compatible | too_soon | unknown` comme signal soft, plus `vie_priority_queue.md`, `application_messages.md`, `history_dashboard.md` et `weekly_digest.md`.
 - La queue, le judge, l'audit, les exports et SQLite exposent aussi `deadline`, `language_check`, `remote_location_validity` et `salary_normalized_annual_eur`.
 - Le judge recoit aussi `required_years`, `experience_check` et `experience_evidence`; les `too_senior` LLM ou deterministes sont retires de la queue actionnable sauf override LLM `junior_ok`, tandis que les cas `stretch` restent visibles.
 - Le scoring expose `doctoral_scope`: bonus leger pour CIFRE/industrial PhD, penalite explicite pour doctorat academique sans salaire/entreprise clair. Cela garde les PhD utiles visibles sans les laisser depasser les jobs/VIE/graduate mieux alignes.
@@ -116,6 +117,7 @@ Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**.
 - `P1`: verifier manuellement les 42 liens `needs_review` et le 1 `server_error` avant candidature.
 - `P1`: verifier manuellement salaire et remote quand l'offre ne publie pas l'information ou quand le LLM marque `unknown`/`weak`.
 - `P2`: confirmer avec RH les dates de demarrage `unknown`/`too_soon`; ne pas filtrer automatiquement sur ce signal.
+- `P2`: exploiter `vie_priority_queue.md` pour les arbitrages VIE; la queue principale ne doit plus etre le seul filtre de decision sur cette voie.
 - `P2`: traiter `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux de tri et de verification; `too_senior` doit rester hors queue actionnable sauf override LLM junior/all-levels explicite.
 - `P2/P3`: surveiller sur les prochains runs le bruit apporte par `Analytics Engineer` et `Applied Scientist`; le premier full run post-extension est correct, mais ces titres doivent rester sous garde-fous niveau/experience.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.

@@ -66,6 +66,7 @@ export type Summary = {
   new_jobs?: number;
   missing_this_run?: number;
   queue_count?: number;
+  vie_queue_count?: number;
   queue_bucket_counts?: Record<string, number>;
   application_status_counts?: Record<string, number>;
   link_status_counts?: Record<string, number>;

@@ -35,6 +35,8 @@ def _remove_stale_llm_outputs(output_dir: Path) -> None:
         "link_checks.md",
         "application_queue.json",
         "application_queue.md",
+        "vie_priority_queue.json",
+        "vie_priority_queue.md",
         "application_messages.json",
         "application_messages.md",
         "history_dashboard.json",

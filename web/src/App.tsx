@@ -251,6 +251,12 @@ export default function App() {
               <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} />
               Actualiser
             </Button>
+            {summary?.links?.vie_queue_markdown ? (
+              <Button variant="outline" size="sm" onClick={() => openLink(summary.links?.vie_queue_markdown)}>
+                <BriefcaseBusiness className="h-4 w-4" />
+                VIE
+              </Button>
+            ) : null}
             <Button variant="ghost" size="icon" aria-label="Deconnexion" onClick={() => void logout()}>
               <LogOut className="h-4 w-4" />
             </Button>
@@ -422,6 +428,7 @@ function LoginScreen({
 function SummaryCards({ summary }: { summary: Summary | null }) {
   const items = [
     { label: "Queue", value: summary?.queue_count ?? 0, icon: BriefcaseBusiness },
+    { label: "VIE", value: summary?.vie_queue_count ?? 0, icon: FileText },
     { label: "Apply now", value: summary?.queue_bucket_counts?.apply_now ?? 0, icon: CheckCircle2 },
     { label: "Postule", value: summary?.application_status_counts?.applied ?? 0, icon: MessageSquareText },
     { label: "Liens vus", value: summary?.audit?.link_checked_count ?? 0, icon: ExternalLink },

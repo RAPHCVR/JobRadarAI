@@ -11,6 +11,7 @@ L'interface expose:
 - dashboard pipeline par statut candidature;
 - queue filtrable par bucket, marche, statut lien, statut utilisateur et recherche texte, avec tri radar/score/dernieres notes;
 - detail offre avec signaux `start_date_check`, `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check`, salaire normalise quand disponible;
+- lien direct vers `vie_priority_queue.md` pour la lane VIE dediee;
 - edition de `application_status`, `fit_status`, priorite, notes, prochaine action, contact, URL de candidature, URL contact/profil RH, dernier contact et variante CV;
 - timeline manuelle par offre;
 - bouton d'ouverture du lien de candidature, ouverture contact et copie du message RH avec feedback visuel;
