@@ -34,7 +34,7 @@ Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**.
 - Audit dedupe 2026-05-09: le gros ecart apparent venait surtout du cumul `stale` et d'un churn Jooble cause par des parametres d'URL volatils; les IDs stables canonisent maintenant les liens Jooble.
 - Audit sources 2026-05-10: les autres sources a delta ou zero count ont ete verifiees. Aucun autre faux-churn d'ID detecte; Jobicy avait seulement une strategie tag trop stricte et utilise maintenant un fallback global filtre localement. GermanTechJobs n'etait pas casse, mais le cap RSS `400` etait trop bas pour un flux live >2000 items; il passe a `1200`. France Travail pagine maintenant `3 x 50` resultats par requete et inclut `data scientist`/France data/MDM; smoke live apres correctif: **1231** IDs uniques, **10/10** anciennes absentes retrouvees, **189** offres >= 60 de score.
 - P0: aucun blocage runtime detecte.
-- Plateforme web: `jobradarai-web` Running 1/1 sur Kubernetes, ingress `jobs.raphcvr.me`, HTTPS `/api/health` OK, PVC synchronise avec `run_name=20260510-173933`, `queue_count=300`, `llm_count=1200`.
+- Plateforme web: `jobradarai-web` Running 1/1 sur Kubernetes, image `ghcr.io/raphcvr/jobradarai-web:sha-0014aed`, ingress `jobs.raphcvr.me`, HTTPS `/api/health` OK, PVC synchronise avec `run_name=20260510-173933`, `queue_count=300`, `llm_count=1200`.
 
 ## Repos Et Systemes Audites
 
