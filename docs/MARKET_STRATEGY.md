@@ -126,28 +126,29 @@
 
 ## Audit Dernier Run
 
-Run valide du 2026-05-09 19:59 Europe/Paris:
+Run valide du 2026-05-10 19:26 Europe/Paris, snapshot `20260510-173933`:
 
-- France: 847 offres, meilleur fit langue/visa/proximite.
-- Allemagne: 706 offres, gros volume a filtrer par langue.
-- UK: 586 offres, marche AI/data fort mais visa hors UE.
-- Irlande: 345 offres, cible anglophone UE prioritaire.
-- Remote Europe: 295 offres.
-- Espagne: 291 offres, opportuniste si salaire/fit solides.
-- Belgique: 291 offres, bon fit FR/EN/UE, renforce via Forem et Actiris.
-- Singapour: 264 offres, marche AI anglophone mais relocation/visa.
-- Suede: 260 offres.
-- Pays-Bas: 246 offres.
-- Suisse: 207 offres, premium salaire mais marche selectif/permis a verifier.
-- Norvege: 135 offres.
-- Pologne: 112 offres.
-- Portugal: 104 offres.
-- Autriche: 100 offres.
-- Danemark: 71 offres.
-- Tchequie: 50 offres.
-- Finlande: 32 offres.
-- Luxembourg: 32 offres.
+- France: 1075 offres, meilleur fit langue/visa/proximite.
+- Allemagne: 973 offres, gros volume a filtrer par langue.
+- UK: 584 offres, marche AI/data fort mais visa hors UE.
+- Irlande: 343 offres, cible anglophone UE prioritaire.
+- Belgique: 325 offres, bon fit FR/EN/UE, renforce via Forem et Actiris.
+- Remote Europe: 297 offres.
+- Espagne: 290 offres, opportuniste si salaire/fit solides.
+- Singapour: 269 offres, marche AI anglophone mais relocation/visa.
+- Suede: 263 offres.
+- Pays-Bas: 244 offres.
+- Suisse: 210 offres, premium salaire mais marche selectif/permis a verifier.
+- Norvege: 133 offres.
+- Pologne: 111 offres.
+- Autriche: 98 offres.
+- Portugal: 89 offres.
+- Danemark: 72 offres.
+- Tchequie: 49 offres.
+- Finlande: 33 offres.
+- Luxembourg: 33 offres.
 - Estonie: 2 offres.
-- Remote/hybride detecte: 2089 offres.
-- Salaire publie hors VIE: 521 offres, dont 466 >= 45k EUR.
-- VIE Business France: 532 missions retenues, indemnite mensuelle observee de 2610 a 4427 EUR.
+- Remote/hybride detecte: 2180 offres.
+- Salaire publie hors VIE: 899 offres, dont 793 >= 45k EUR.
+- VIE Business France: 509 missions retenues, indemnite mensuelle observee de 2610 a 4427 EUR.
+- Judge LLM: 1200 offres en mode `wide`, 0 `fallback_default`, queue actionnable de 300 items.
