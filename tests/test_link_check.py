@@ -5,7 +5,7 @@ import tempfile
 import json
 from pathlib import Path
 
-from jobradai.link_check import _classify_http_response, _select_jobs_for_link_check
+from jobradai.link_check import _classify_http_response, _load_shortlist, _select_jobs_for_link_check
 from jobradai.snapshot import write_snapshot
 
 
@@ -19,6 +19,9 @@ class LinkCheckTests(unittest.TestCase):
         self.assertEqual(_classify_http_response("ie.indeed.com", 200, "<html>ok</html>"), "browser_required")
         self.assertEqual(_classify_http_response("jobs.example.com", 403, "forbidden"), "browser_required")
         self.assertEqual(_classify_http_response("jobs.example.com", 200, "Cloudflare Security Check"), "browser_required")
+
+    def test_classifies_france_travail_conflict_as_browser_required(self) -> None:
+        self.assertEqual(_classify_http_response("candidat.francetravail.fr", 409, ""), "browser_required")
 
     def test_selection_keeps_shortlist_items_beyond_top_limit(self) -> None:
         jobs = [
@@ -42,6 +45,28 @@ class LinkCheckTests(unittest.TestCase):
         }
         selected = _select_jobs_for_link_check(jobs, shortlist, limit=3)
         self.assertEqual([job["stable_id"] for job in selected], ["actionable", "fallback"])
+
+    def test_shortlist_loader_includes_llm_augments_for_link_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp)
+            (output / "llm_shortlist.json").write_text(
+                json.dumps({"items": [{"stable_id": "base", "priority": "shortlist"}]}),
+                encoding="utf-8",
+            )
+            augment_dir = output / "llm_augments"
+            augment_dir.mkdir()
+            (augment_dir / "targeted.json").write_text(
+                json.dumps({"items": [{"stable_id": "augmented", "priority": "apply_now"}]}),
+                encoding="utf-8",
+            )
+            shortlist = _load_shortlist(output / "llm_shortlist.json")
+            jobs = [
+                {"stable_id": "base", "url": "https://example.com/base"},
+                {"stable_id": "augmented", "url": "https://example.com/augmented"},
+            ]
+            selected = _select_jobs_for_link_check(jobs, shortlist, limit=0)
+            self.assertEqual([job["stable_id"] for job in selected], ["base", "augmented"])
+            self.assertEqual(shortlist["augment_count"], 1)
 
     def test_write_snapshot_copies_outputs_and_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

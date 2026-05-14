@@ -151,4 +151,4 @@ Run valide du 2026-05-10 19:26 Europe/Paris, snapshot `20260510-173933`:
 - Remote/hybride detecte: 2180 offres.
 - Salaire publie hors VIE: 899 offres, dont 793 >= 45k EUR.
 - VIE Business France: 509 missions retenues, indemnite mensuelle observee de 2610 a 4427 EUR.
-- Judge LLM: 1200 offres en mode `wide`, 0 `fallback_default`, queue actionnable de 300 items.
+- Judge LLM: 2733 jugements exploites (1200 base `wide` + 1533 augments cibles), 0 `fallback_default`, queue actionnable de 300 items.

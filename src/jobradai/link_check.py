@@ -196,7 +196,7 @@ def _classify_http_response(host: str, status: int, body: str) -> str:
     text = body.lower()
     if status in {404, 410}:
         return "expired"
-    if status in {401, 403, 429}:
+    if status in {401, 403, 429} or _is_browser_only_conflict(host, status):
         return "browser_required"
     if any(pattern in text for pattern in ANTI_BOT_PATTERNS):
         return "browser_required"
@@ -212,7 +212,7 @@ def _classify_http_response(host: str, status: int, body: str) -> str:
 def _reason_for_response(host: str, status: int, body: str) -> str:
     if status in {404, 410}:
         return "Offre possiblement expiree ou lien supprime."
-    if status in {401, 403, 429}:
+    if status in {401, 403, 429} or _is_browser_only_conflict(host, status):
         return f"HTTP {status}: acces protege, rate-limit ou verification navigateur requise."
     if any(pattern in body.lower() for pattern in ANTI_BOT_PATTERNS):
         return "Page protegee par anti-bot ou verification humaine."
@@ -270,7 +270,50 @@ def _load_shortlist(path: Path | None) -> dict[str, Any]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
-    return data if isinstance(data, dict) else {}
+    if not isinstance(data, dict):
+        return {}
+    return _with_shortlist_augments(path.parent, data)
+
+
+def _with_shortlist_augments(output_dir: Path, shortlist: dict[str, Any]) -> dict[str, Any]:
+    augment_dir = output_dir / "llm_augments"
+    if not augment_dir.exists():
+        return shortlist
+    base_items = [item for item in shortlist.get("items", []) if isinstance(item, dict)]
+    seen = {str(item.get("stable_id") or "") for item in base_items}
+    augmented: list[dict[str, Any]] = []
+    augment_files: list[str] = []
+    for path in sorted(augment_dir.glob("*.json")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue
+        items = data.get("items", []) if isinstance(data, dict) else []
+        if not isinstance(items, list):
+            continue
+        added_from_file = 0
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            stable_id = str(item.get("stable_id") or "")
+            if not stable_id or stable_id in seen:
+                continue
+            seen.add(stable_id)
+            augmented.append(item)
+            added_from_file += 1
+        if added_from_file:
+            augment_files.append(str(path))
+    if not augmented:
+        return shortlist
+    merged_items = base_items + augmented
+    priority_counts = Counter(str(item.get("priority") or "unknown") for item in merged_items)
+    merged = dict(shortlist)
+    merged["items"] = merged_items
+    merged["count"] = len(merged_items)
+    merged["priority_counts"] = dict(priority_counts)
+    merged["augment_count"] = len(augmented)
+    merged["augment_files"] = augment_files
+    return merged
 
 
 def _parse_http_url(url: str) -> urllib.parse.SplitResult | None:
@@ -291,3 +334,7 @@ def _domain(url: str) -> str:
 def _is_aggregator(host: str) -> bool:
     normalized = host.lower()
     return any(domain in normalized for domain in AGGREGATOR_DOMAINS)
+
+
+def _is_browser_only_conflict(host: str, status: int) -> bool:
+    return status == 409 and host.lower().endswith("francetravail.fr")

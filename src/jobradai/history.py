@@ -93,6 +93,40 @@ VIE_TECHNICAL_PATTERN = re.compile(
     r")\b",
     re.IGNORECASE,
 )
+UNJUDGED_WATCH_MIN_SCORE = 55.0
+UNJUDGED_WATCH_PATTERN = re.compile(
+    r"\b("
+    r"ai|ia|artificial intelligence|machine learning|mlops|llmops|llm|genai|generative ai|"
+    r"foundation model|research engineer|research scientist|software engineer|swe|software developer|developer|"
+    r"developpeur|developpeuse|développeur|développeuse|full[- ]?stack|backend|data engineer|"
+    r"data scientist|ml engineer|devops|platform engineer|observability|retrieval|agentic|"
+    r"agents?|evals?|evaluations?|reinforcement learning|nlp|python|cloud engineer|k8s|kubernetes"
+    r")\b",
+    re.IGNORECASE,
+)
+UNJUDGED_WATCH_BRAND_PATTERN = re.compile(
+    r"\b("
+    r"mistral ai|mistral|anthropic|openai|cohere|poolside|langchain|elevenlabs|dataiku|"
+    r"databricks|snowflake|hugging face|qdrant|perplexity ai|perplexity|canonical|datadog|"
+    r"google deepmind|deepmind|h company|scale ai|weights & biases|wandb|elastic|mongodb|"
+    r"doctolib|pigment|modal|nabla"
+    r")\b",
+    re.IGNORECASE,
+)
+UNJUDGED_WATCH_EXCLUDED_TITLE_PATTERN = re.compile(
+    r"\b("
+    r"senior|staff|principal|manager|head|director|lead|architect|business partner|"
+    r"people partner|sales|account executive|accountant|account development|marketing|"
+    r"product manager|program manager|project manager|recruiter|talent|legal|finance|"
+    r"front desk|designer|buyer|hr|compliance|owner|teamleiter|directeur|responsable|"
+    r"partner development representative|systems analyst|business manager"
+    r")\b",
+    re.IGNORECASE,
+)
+UNJUDGED_WATCH_SOFT_TITLE_PATTERN = re.compile(
+    r"\b(strategist|strategy|consultant|consulting|deployment strategist|solutions? engineer|field engineer|support|sustaining|maintenance)\b",
+    re.IGNORECASE,
+)
 
 
 def sync_history(
@@ -111,6 +145,7 @@ def sync_history(
     jobs = [job for job in jobs if isinstance(job, dict)]
     shortlist = _read_json(output_dir / "llm_shortlist.json", {})
     shortlist = shortlist if isinstance(shortlist, dict) else {}
+    shortlist = _with_shortlist_augments(output_dir, shortlist)
     link_checks = _read_json(output_dir / "link_checks.json", {})
     link_checks = link_checks if isinstance(link_checks, dict) else {}
 
@@ -121,6 +156,7 @@ def sync_history(
     history_db.parent.mkdir(parents=True, exist_ok=True)
 
     shortlist_by_id = _shortlist_by_id(shortlist)
+    shortlist_augment_count = int(shortlist.get("augment_count") or 0)
     link_by_id = _link_by_id(link_checks)
     current_ids = {str(job.get("stable_id") or "") for job in jobs if job.get("stable_id")}
 
@@ -156,6 +192,13 @@ def sync_history(
         queue = _queue_rows(conn)
         queue_ids = {str(item.get("stable_id") or "") for item in queue}
         vie_queue = _vie_priority_rows(conn, queue_ids=queue_ids)
+        vie_ids = {str(item.get("stable_id") or "") for item in vie_queue}
+        unjudged_watch = _unjudged_watch_rows(
+            conn,
+            current_llm_ids=set(shortlist_by_id),
+            queue_ids=queue_ids,
+            vie_ids=vie_ids,
+        )
         presence_counts = _presence_counts(conn)
         source_counts = _source_counts(conn)
         result = {
@@ -175,11 +218,17 @@ def sync_history(
             "vie_queue_count": len(vie_queue),
             "vie_queue_bucket_counts": dict(Counter(str(item.get("vie_bucket", "")) for item in vie_queue)),
             "vie_queue_llm_counts": dict(Counter("judged" if item.get("llm_judged") else "unjudged" for item in vie_queue)),
+            "unjudged_watch_count": len(unjudged_watch),
+            "unjudged_watch_bucket_counts": dict(Counter(str(item.get("watch_bucket", "")) for item in unjudged_watch)),
+            "llm_augment_count": shortlist_augment_count,
+            "llm_augment_files": shortlist.get("augment_files", []),
+            "llm_augment_priority_counts": shortlist.get("augment_priority_counts", {}),
             "presence_counts": presence_counts,
             "source_counts": source_counts,
             "previous_run": previous_summary,
             "items": queue,
             "vie_items": vie_queue,
+            "unjudged_watch_items": unjudged_watch,
         }
         _preserve_same_run_counters(result, existing_run_summary)
         result["history_dashboard"] = _dashboard_summary(result)
@@ -192,6 +241,11 @@ def sync_history(
     (output_dir / "application_queue.md").write_text(_queue_markdown(result), encoding="utf-8")
     (output_dir / "vie_priority_queue.json").write_text(json.dumps(_vie_queue_payload(result), ensure_ascii=False, indent=2), encoding="utf-8")
     (output_dir / "vie_priority_queue.md").write_text(_vie_queue_markdown(result), encoding="utf-8")
+    (output_dir / "unjudged_watch_queue.json").write_text(
+        json.dumps(_unjudged_watch_payload(result), ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    (output_dir / "unjudged_watch_queue.md").write_text(_unjudged_watch_markdown(result), encoding="utf-8")
     (output_dir / "application_messages.json").write_text(
         json.dumps(_application_messages(result), ensure_ascii=False, indent=2),
         encoding="utf-8",
@@ -550,6 +604,59 @@ def _vie_priority_rows(conn: sqlite3.Connection, *, queue_ids: set[str], limit: 
     return items[:limit]
 
 
+def _unjudged_watch_rows(
+    conn: sqlite3.Connection,
+    *,
+    current_llm_ids: set[str],
+    queue_ids: set[str],
+    vie_ids: set[str],
+    limit: int = 80,
+) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM job_history
+        WHERE presence_status != 'expired'
+          AND score >= ?
+        ORDER BY score DESC, last_seen DESC
+        """,
+        (UNJUDGED_WATCH_MIN_SCORE,),
+    ).fetchall()
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        stable_id = str(item.get("stable_id") or "")
+        if not stable_id or stable_id in current_llm_ids or stable_id in queue_ids or stable_id in vie_ids:
+            continue
+        job_payload = _payload_dict(item.get("payload_json"))
+        if _deterministic_experience_too_senior(item, job_payload):
+            continue
+        bucket = _unjudged_watch_bucket(item, job_payload)
+        if not bucket:
+            continue
+        early_signal = early_career_signal(job_payload or item)
+        item["queue_bucket"] = _queue_bucket(item)
+        item["watch_bucket"] = bucket
+        item["watch_reason"] = _unjudged_watch_reason(item, job_payload, early_signal)
+        item["ranking_score"] = _ranking_score(item)
+        item["llm_judged"] = bool(item.get("last_llm_seen"))
+        item["in_application_queue"] = stable_id in queue_ids
+        item["in_vie_queue"] = stable_id in vie_ids
+        item["early_career_fit"] = early_signal.get("early_career_fit", "none")
+        item["early_career_structured"] = bool(early_signal.get("structured_program"))
+        item["early_career_signals"] = early_signal.get("signals", [])
+        item["early_career_risks"] = early_signal.get("risks", [])
+        item["required_years"] = job_payload.get("required_years")
+        item["experience_check"] = job_payload.get("experience_check") or "unknown"
+        item["experience_evidence"] = job_payload.get("experience_evidence") or ""
+        if not item.get("last_recruiter_message"):
+            item["last_recruiter_message"] = build_recruiter_message(item)
+        item.pop("payload_json", None)
+        items.append(item)
+    items.sort(key=_unjudged_watch_sort_key)
+    return items[:limit]
+
+
 def _is_vie_item(item: dict[str, Any], job_payload: dict[str, Any]) -> bool:
     tags = job_payload.get("tags")
     tags_text = " ".join(str(tag) for tag in tags) if isinstance(tags, list) else str(tags or "")
@@ -601,13 +708,77 @@ def _has_vie_technical_signal(item: dict[str, Any], job_payload: dict[str, Any])
     return bool(VIE_TECHNICAL_PATTERN.search(" ".join(str(part or "") for part in parts)))
 
 
+def _unjudged_watch_bucket(item: dict[str, Any], job_payload: dict[str, Any]) -> str:
+    score = _safe_float(item.get("score"))
+    if score < UNJUDGED_WATCH_MIN_SCORE:
+        return ""
+    title = str(item.get("title") or "")
+    if UNJUDGED_WATCH_EXCLUDED_TITLE_PATTERN.search(title):
+        return ""
+    core_title = bool(UNJUDGED_WATCH_PATTERN.search(title))
+    brand = _has_unjudged_watch_brand(item, job_payload)
+    soft_title = bool(UNJUDGED_WATCH_SOFT_TITLE_PATTERN.search(title))
+    early_signal = early_career_signal(job_payload or item)
+    early_fit = str(early_signal.get("early_career_fit") or "none")
+    if brand and soft_title and score >= 57:
+        return "ai_strategy_watch"
+    if core_title and soft_title and (brand or score >= 58):
+        return "soft_core_watch"
+    if core_title and (brand or score >= 58 or early_fit in {"high", "medium"}):
+        return "core_watch"
+    return ""
+
+
+def _has_unjudged_watch_brand(item: dict[str, Any], job_payload: dict[str, Any]) -> bool:
+    parts = [
+        item.get("source"),
+        item.get("company"),
+        job_payload.get("source"),
+        job_payload.get("company"),
+    ]
+    return bool(UNJUDGED_WATCH_BRAND_PATTERN.search(" ".join(str(part or "") for part in parts)))
+
+
+def _unjudged_watch_reason(
+    item: dict[str, Any],
+    job_payload: dict[str, Any],
+    early_signal: dict[str, Any],
+) -> str:
+    title = str(item.get("title") or "")
+    reasons: list[str] = []
+    if _has_unjudged_watch_brand(item, job_payload):
+        reasons.append("marque IA/tech forte")
+    if UNJUDGED_WATCH_PATTERN.search(title):
+        reasons.append("titre technique IA/data/software")
+    if _safe_float(item.get("score")) >= 58:
+        reasons.append("score local proche du seuil juge")
+    if str(early_signal.get("early_career_fit") or "none") in {"high", "medium"}:
+        reasons.append("signal junior/graduate")
+    if UNJUDGED_WATCH_SOFT_TITLE_PATTERN.search(title):
+        reasons.append("role soft/strategie a verifier manuellement")
+    return "; ".join(reasons) or "signal watch non juge"
+
+
 def _vie_monthly_allowance(item: dict[str, Any], job_payload: dict[str, Any]) -> float | None:
     salary_raw = " ".join(str(part or "") for part in (job_payload.get("salary"), item.get("salary"))).lower()
     description = str(job_payload.get("description") or "").lower()
     description_raw = description if any(marker in description for marker in ("indemnite", "indemnité", "allowance", "mensuel", "monthly")) else ""
-    raw = " ".join(part for part in (salary_raw, description_raw) if part)
-    if "vie" not in raw and "volontariat" not in raw and "indemnite" not in raw and "indemnité" not in raw:
+    if "vie" not in salary_raw and "volontariat" not in salary_raw and "indemnite" not in salary_raw and "indemnité" not in salary_raw:
+        raw = " ".join(part for part in (salary_raw, description_raw) if part)
+    else:
+        raw = salary_raw
+    values = _vie_allowance_values(raw)
+    if values:
+        return round(max(values), 2)
+    if not description_raw:
         return None
+    values = _vie_allowance_values(description_raw)
+    return round(max(values), 2) if values else None
+
+
+def _vie_allowance_values(raw: str) -> list[float]:
+    if "vie" not in raw and "volontariat" not in raw and "indemnite" not in raw and "indemnité" not in raw:
+        return []
     values: list[float] = []
     for match in re.finditer(r"\d+(?:[ .]\d{3})*(?:[,.]\d+)?", raw):
         compact = match.group(0).replace(" ", "")
@@ -619,14 +790,10 @@ def _vie_monthly_allowance(item: dict[str, Any], job_payload: dict[str, Any]) ->
             number = float(compact)
         except ValueError:
             continue
-        if number >= 500:
-            values.append(number)
-    if not values:
-        return None
-    best = max(values)
-    if best > 10000:
-        return round(best / 12, 2)
-    return round(best, 2)
+        monthly = number / 12 if number > 10000 else number
+        if 500 <= monthly <= 6000:
+            values.append(monthly)
+    return values
 
 
 def _queue_bucket(item: dict[str, Any]) -> str:
@@ -675,6 +842,22 @@ def _vie_sort_key(item: dict[str, Any]) -> tuple[int, int, float, float, float, 
     )
 
 
+def _unjudged_watch_sort_key(item: dict[str, Any]) -> tuple[int, int, float, float, str]:
+    active_rank = 0 if str(item.get("presence_status") or "") == "active" else 1
+    bucket_rank = {
+        "core_watch": 0,
+        "soft_core_watch": 1,
+        "ai_strategy_watch": 2,
+    }.get(str(item.get("watch_bucket") or ""), 9)
+    return (
+        active_rank,
+        bucket_rank,
+        -_ranking_score(item),
+        -_safe_float(item.get("score")),
+        f"{9999999999 - _timestamp_seconds(item.get('last_seen')):010d}",
+    )
+
+
 def _timestamp_seconds(value: Any) -> int:
     if not value:
         return 0
@@ -686,7 +869,7 @@ def _timestamp_seconds(value: Any) -> int:
 
 
 def _deterministic_experience_too_senior(item: dict[str, Any], job_payload: dict[str, Any]) -> bool:
-    if str(item.get("last_level_fit") or "") == "junior_ok":
+    if str(item.get("last_level_fit") or "").strip().lower() in {"junior_ok", "stretch"}:
         return False
     return str(job_payload.get("experience_check") or "").strip().lower() == "too_senior"
 
@@ -704,11 +887,36 @@ def _queue_markdown(result: dict[str, Any]) -> str:
         f"- Anciennes offres pertinentes reverifiees: **{result.get('rechecked_stale', 0)}**",
         f"- Queue dedupee: **{result.get('queue_count', 0)}**",
         f"- Lane VIE dediee: **{result.get('vie_queue_count', 0)}**",
+        f"- Lane watch non jugee: **{result.get('unjudged_watch_count', 0)}**",
+        f"- Augments LLM cibles: **{result.get('llm_augment_count', 0)}** `{result.get('llm_augment_priority_counts', {})}`",
         f"- Statuts queue: `{result.get('queue_status_counts', {})}`",
         f"- Priorites queue: `{result.get('queue_priority_counts', {})}`",
         f"- Priorites VIE: `{result.get('vie_queue_bucket_counts', {})}`",
+        f"- Priorites watch non jugee: `{result.get('unjudged_watch_bucket_counts', {})}`",
         "",
     ]
+    watch_rows = [item for item in result.get("unjudged_watch_items", []) if isinstance(item, dict)]
+    lines.extend(["## Watch Non Jugee", ""])
+    if not watch_rows:
+        lines.append("- Aucun item.")
+    for item in watch_rows[:80]:
+        status = item.get("presence_status") or ""
+        link_status = item.get("last_link_status") or "not_checked"
+        score = float(item.get("score") or 0)
+        ranking_score = float(item.get("ranking_score") or score)
+        lines.append(
+            f"- `{status}` link `{link_status}` | bucket `{item.get('watch_bucket') or 'watch'}` | rank {ranking_score:.1f} | local {score:.1f} | "
+            f"niveau `{item.get('last_level_fit') or 'unknown'}` | "
+            f"exp `{item.get('experience_check') or 'unknown'}`/{_required_years_label(item.get('required_years'))} | "
+            f"salaire `{item.get('last_salary_check') or 'unknown'}` | "
+            f"remote `{item.get('last_remote_check') or 'unknown'}` | "
+            f"langue `{item.get('last_language_check') or 'unknown'}` | "
+            f"deadline `{item.get('deadline') or 'n/a'}` | "
+            f"{item.get('title')} - {item.get('company')} | {item.get('market')} | {item.get('url')}"
+        )
+        if item.get("watch_reason"):
+            lines.append(f"  - Signal: {item.get('watch_reason')}")
+    lines.append("")
     early_rows = [
         item
         for item in result.get("items", [])
@@ -832,6 +1040,104 @@ def _vie_queue_markdown(result: dict[str, Any]) -> str:
                 lines.append(f"  - Angle: {item.get('last_application_angle')}")
         lines.append("")
     return "\n".join(lines)
+
+
+def _unjudged_watch_payload(result: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "generated_at": result.get("generated_at", ""),
+        "run_name": result.get("run_name", ""),
+        "current_jobs": result.get("current_jobs", 0),
+        "known_jobs": result.get("known_jobs", 0),
+        "unjudged_watch_count": result.get("unjudged_watch_count", 0),
+        "unjudged_watch_bucket_counts": result.get("unjudged_watch_bucket_counts", {}),
+        "items": result.get("unjudged_watch_items", []),
+    }
+
+
+def _unjudged_watch_markdown(result: dict[str, Any]) -> str:
+    payload = _unjudged_watch_payload(result)
+    lines = [
+        "# Unjudged Watch Queue",
+        "",
+        f"- Genere le: {payload.get('generated_at', '')}",
+        f"- Run: `{payload.get('run_name', '')}`",
+        f"- Offres watch non jugees: **{payload.get('unjudged_watch_count', 0)}**",
+        f"- Buckets: `{payload.get('unjudged_watch_bucket_counts', {})}`",
+        "",
+        "Cette sortie surveille les offres non jugees LLM mais avec signal fort IA/data/software, afin qu'elles ne disparaissent pas derriere le top 1200.",
+        "",
+    ]
+    sections = [
+        ("Core Watch", "core_watch"),
+        ("Soft Core Watch", "soft_core_watch"),
+        ("AI Strategy Watch", "ai_strategy_watch"),
+    ]
+    items = [item for item in payload.get("items", []) if isinstance(item, dict)]
+    for title, bucket in sections:
+        rows = [item for item in items if item.get("watch_bucket") == bucket]
+        lines.extend([f"## {title}", ""])
+        if not rows:
+            lines.append("- Aucun item.")
+        for item in rows[:100]:
+            score = _safe_float(item.get("score"))
+            ranking_score = _ranking_score(item)
+            llm = "judged" if item.get("llm_judged") else "unjudged"
+            lines.append(
+                f"- `{item.get('presence_status') or ''}` link `{item.get('last_link_status') or 'not_checked'}` | "
+                f"{llm} | rank {ranking_score:.1f} | local {score:.1f} | "
+                f"niveau `{item.get('last_level_fit') or 'unknown'}` | "
+                f"exp `{item.get('experience_check') or 'unknown'}`/{_required_years_label(item.get('required_years'))} | "
+                f"salaire `{item.get('last_salary_check') or 'unknown'}` | "
+                f"remote `{item.get('last_remote_check') or 'unknown'}` | "
+                f"deadline `{item.get('deadline') or 'n/a'}` | "
+                f"{item.get('title')} - {item.get('company')} | {item.get('market')} | {item.get('url')}"
+            )
+            if item.get("watch_reason"):
+                lines.append(f"  - Signal: {item.get('watch_reason')}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _with_shortlist_augments(output_dir: Path, shortlist: dict[str, Any]) -> dict[str, Any]:
+    augment_dir = output_dir / "llm_augments"
+    if not augment_dir.exists() or not augment_dir.is_dir():
+        return shortlist
+    base_items = [item for item in shortlist.get("items", []) if isinstance(item, dict)]
+    by_id = {str(item.get("stable_id") or ""): item for item in base_items if item.get("stable_id")}
+    added: list[dict[str, Any]] = []
+    files: list[str] = []
+    for path in sorted(augment_dir.glob("*.json")):
+        payload = _read_json(path, {})
+        if not isinstance(payload, dict):
+            continue
+        items = payload.get("items", [])
+        if not isinstance(items, list):
+            continue
+        file_added = 0
+        for item in items:
+            if not isinstance(item, dict) or not item.get("stable_id"):
+                continue
+            stable_id = str(item.get("stable_id") or "")
+            if stable_id in by_id:
+                continue
+            item = dict(item)
+            item["llm_augment_source"] = path.name
+            by_id[stable_id] = item
+            added.append(item)
+            file_added += 1
+        if file_added:
+            files.append(path.name)
+    if not added:
+        return shortlist
+    merged = dict(shortlist)
+    merged_items = base_items + added
+    merged["items"] = merged_items
+    merged["count"] = len(merged_items)
+    merged["augment_count"] = len(added)
+    merged["augment_files"] = files
+    merged["augment_priority_counts"] = dict(Counter(str(item.get("priority") or "unknown") for item in added))
+    merged["priority_counts"] = dict(Counter(str(item.get("priority") or "unknown") for item in merged_items))
+    return merged
 
 
 def _shortlist_by_id(shortlist: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -1003,6 +1309,7 @@ def _dashboard_summary(result: dict[str, Any]) -> dict[str, Any]:
         "rechecked_stale": int(result.get("rechecked_stale") or 0),
         "queue_count": int(result.get("queue_count") or 0),
         "vie_queue_count": int(result.get("vie_queue_count") or 0),
+        "unjudged_watch_count": int(result.get("unjudged_watch_count") or 0),
         "active_jobs": int(presence.get("active") or 0),
         "stale_jobs": int(presence.get("stale") or 0),
         "expired_jobs": int(presence.get("expired") or 0),
@@ -1011,6 +1318,9 @@ def _dashboard_summary(result: dict[str, Any]) -> dict[str, Any]:
         "queue_priority_counts": result.get("queue_priority_counts", {}),
         "vie_queue_bucket_counts": result.get("vie_queue_bucket_counts", {}),
         "vie_queue_llm_counts": result.get("vie_queue_llm_counts", {}),
+        "unjudged_watch_bucket_counts": result.get("unjudged_watch_bucket_counts", {}),
+        "llm_augment_count": int(result.get("llm_augment_count") or 0),
+        "llm_augment_priority_counts": result.get("llm_augment_priority_counts", {}),
         "source_counts": result.get("source_counts", {}),
         "returned_ids": result.get("returned_ids", []),
     }
@@ -1021,6 +1331,7 @@ def _dashboard_summary(result: dict[str, Any]) -> dict[str, Any]:
             "new_jobs": summary["new_jobs"] - int(previous.get("new_jobs") or 0),
             "queue_count": summary["queue_count"] - int(previous.get("queue_count") or 0),
             "vie_queue_count": summary["vie_queue_count"] - int(previous.get("vie_queue_count") or 0),
+            "unjudged_watch_count": summary["unjudged_watch_count"] - int(previous.get("unjudged_watch_count") or 0),
             "active_jobs": summary["active_jobs"] - int(previous.get("active_jobs") or 0),
             "stale_jobs": summary["stale_jobs"] - int(previous.get("stale_jobs") or 0),
             "expired_jobs": summary["expired_jobs"] - int(previous.get("expired_jobs") or 0),
@@ -1106,8 +1417,11 @@ def _history_dashboard_markdown(summary: dict[str, Any]) -> str:
         f"- Offres expirees historiques: **{summary.get('expired_jobs', 0)}**",
         f"- Queue candidature: **{summary.get('queue_count', 0)}**",
         f"- Lane VIE: **{summary.get('vie_queue_count', 0)}**",
+        f"- Lane watch non jugee: **{summary.get('unjudged_watch_count', 0)}**",
+        f"- Augments LLM cibles: **{summary.get('llm_augment_count', 0)}** `{summary.get('llm_augment_priority_counts', {})}`",
         f"- Presence: `{summary.get('presence_counts', {})}`",
         f"- Buckets VIE: `{summary.get('vie_queue_bucket_counts', {})}`",
+        f"- Buckets watch non jugee: `{summary.get('unjudged_watch_bucket_counts', {})}`",
         f"- Deltas vs precedent: `{deltas}`",
         "",
         "## Sources historiques",
@@ -1135,6 +1449,8 @@ def _weekly_digest_markdown(summary: dict[str, Any]) -> str:
         f"- Offres expirees historiques: **{summary.get('expired_jobs', 0)}**",
         f"- Queue candidature: **{summary.get('queue_count', 0)}**",
         f"- Lane VIE: **{summary.get('vie_queue_count', 0)}**",
+        f"- Lane watch non jugee: **{summary.get('unjudged_watch_count', 0)}**",
+        f"- Augments LLM cibles: **{summary.get('llm_augment_count', 0)}**",
         f"- Deltas: `{deltas}`",
     ]
     returned = summary.get("returned_ids", [])

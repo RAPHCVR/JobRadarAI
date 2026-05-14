@@ -114,6 +114,63 @@ class AuditTests(unittest.TestCase):
             report = write_audit(output, config)
         self.assertTrue(report["llm_shortlist"]["available"])
 
+    def test_write_audit_merges_current_llm_augments(self) -> None:
+        config = load_config(load_env=False)
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp)
+            jobs = [
+                {"stable_id": "base", "market": "france", "source": "France Travail", "score": 70},
+                {"stable_id": "vie", "market": "germany", "source": "Business France VIE", "score": 70},
+                {"stable_id": "extra", "market": "ireland", "source": "JobSpy Direct", "score": 70},
+            ]
+            (output / "jobs.json").write_text(json.dumps(jobs), encoding="utf-8")
+            (output / "sources.json").write_text(json.dumps([]), encoding="utf-8")
+            (output / "llm_shortlist.json").write_text(
+                json.dumps(
+                    {
+                        "count": 1,
+                        "jobs_fingerprint": jobs_fingerprint(jobs),
+                        "selection_mode": "wide",
+                        "selection_summary": {"available_jobs": 3, "selected_jobs": 1, "available_vie": 1, "selected_vie": 0},
+                        "endpoint_counts": {"responses": 1},
+                        "fallback_items": 0,
+                        "fallback_batches": 0,
+                        "batches": [{"ids": ["base"]}],
+                        "items": [{"stable_id": "base", "priority": "apply_now"}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            augment_dir = output / "llm_augments"
+            augment_dir.mkdir()
+            (augment_dir / "targeted.json").write_text(
+                json.dumps(
+                    {
+                        "endpoint_counts": {"responses_sdk": 2},
+                        "fallback_items": 1,
+                        "fallback_batches": 1,
+                        "quality": {"fallback_errors": ["schema_retry"]},
+                        "batches": [{"ids": ["vie"]}, {"ids": ["extra"]}],
+                        "items": [
+                            {"stable_id": "vie", "priority": "shortlist"},
+                            {"stable_id": "extra", "priority": "skip"},
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+            report = write_audit(output, config)
+        llm = report["llm_shortlist"]
+        self.assertEqual(llm["count"], 3)
+        self.assertEqual(llm["batch_count"], 3)
+        self.assertEqual(llm["fallback_items"], 1)
+        self.assertAlmostEqual(llm["fallback_ratio"], 1 / 3)
+        self.assertEqual(llm["endpoint_counts"], {"responses": 1, "responses_sdk": 2})
+        self.assertEqual(llm["priority_counts"], {"apply_now": 1, "shortlist": 1, "skip": 1})
+        self.assertEqual(llm["selection_summary"]["selected_jobs"], 3)
+        self.assertEqual(llm["selection_summary"]["selected_vie"], 1)
+        self.assertEqual(report["restriction"]["llm_selected_vie"], 1)
+
     def test_empty_corpus_is_p0_not_false_ok(self) -> None:
         config = load_config(load_env=False)
         report = build_audit([], [], {}, config)

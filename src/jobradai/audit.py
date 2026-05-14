@@ -47,7 +47,9 @@ def _read_fresh_shortlist(shortlist_path: Path, jobs_path: Path, jobs: list[dict
     data = _read_json(shortlist_path, {})
     if not isinstance(data, dict):
         return {}
-    return data if _shortlist_matches_jobs(data, jobs) else {}
+    if not _shortlist_matches_jobs(data, jobs):
+        return {}
+    return _with_shortlist_augments(shortlist_path.parent, data, jobs_path, jobs)
 
 
 def _shortlist_matches_jobs(shortlist: dict[str, Any], jobs: list[dict[str, Any]]) -> bool:
@@ -82,6 +84,143 @@ def _shortlist_matches_jobs(shortlist: dict[str, Any], jobs: list[dict[str, Any]
             batch_ids.update(str(item) for item in ids if item)
     candidate_ids = item_ids | batch_ids
     return bool(candidate_ids) and candidate_ids.issubset(job_ids)
+
+
+def _with_shortlist_augments(
+    output_dir: Path,
+    shortlist: dict[str, Any],
+    jobs_path: Path,
+    jobs: list[dict[str, Any]],
+) -> dict[str, Any]:
+    augment_dir = output_dir / "llm_augments"
+    if not augment_dir.exists():
+        return shortlist
+
+    job_by_id = {
+        str(job.get("stable_id") or ""): job
+        for job in jobs
+        if isinstance(job, dict) and job.get("stable_id")
+    }
+    if not job_by_id:
+        return shortlist
+
+    try:
+        jobs_mtime = jobs_path.stat().st_mtime if jobs_path.exists() else 0
+    except OSError:
+        jobs_mtime = 0
+
+    base_items = [item for item in shortlist.get("items", []) if isinstance(item, dict)]
+    seen = {str(item.get("stable_id") or "") for item in base_items if item.get("stable_id")}
+    merged_items = list(base_items)
+    merged_batches = [batch for batch in shortlist.get("batches", []) if isinstance(batch, dict)]
+    base_endpoint_counts = shortlist.get("endpoint_counts", {})
+    endpoint_counts = Counter()
+    if isinstance(base_endpoint_counts, dict):
+        endpoint_counts.update({str(key): int(value or 0) for key, value in base_endpoint_counts.items()})
+    fallback_items = int(shortlist.get("fallback_items", 0) or 0)
+    fallback_batches = int(shortlist.get("fallback_batches", 0) or 0)
+    fallback_errors: list[Any] = []
+    quality = shortlist.get("quality", {})
+    if isinstance(quality, dict) and isinstance(quality.get("fallback_errors"), list):
+        fallback_errors.extend(quality.get("fallback_errors", []))
+
+    augment_files: list[str] = []
+    augment_count = 0
+    for path in sorted(augment_dir.glob("*.json")):
+        try:
+            if jobs_mtime and path.stat().st_mtime < jobs_mtime:
+                continue
+        except OSError:
+            continue
+        data = _read_json(path, {})
+        if not isinstance(data, dict):
+            continue
+        items = data.get("items", [])
+        if not isinstance(items, list):
+            continue
+
+        added_from_file = 0
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            stable_id = str(item.get("stable_id") or "")
+            if not stable_id or stable_id in seen or stable_id not in job_by_id:
+                continue
+            seen.add(stable_id)
+            merged_items.append(item)
+            added_from_file += 1
+        if not added_from_file:
+            continue
+
+        augment_count += added_from_file
+        augment_files.append(str(path))
+        batches = data.get("batches", [])
+        if isinstance(batches, list):
+            merged_batches.extend(batch for batch in batches if isinstance(batch, dict))
+        file_endpoint_counts = data.get("endpoint_counts", {})
+        if isinstance(file_endpoint_counts, dict):
+            endpoint_counts.update(
+                {
+                    str(key): int(value or 0)
+                    for key, value in file_endpoint_counts.items()
+                }
+            )
+        fallback_items += int(data.get("fallback_items", 0) or 0)
+        fallback_batches += int(data.get("fallback_batches", 0) or 0)
+        file_quality = data.get("quality", {})
+        if isinstance(file_quality, dict) and isinstance(file_quality.get("fallback_errors"), list):
+            fallback_errors.extend(file_quality.get("fallback_errors", []))
+
+    if not augment_count:
+        return shortlist
+
+    priority_counts = Counter(str(item.get("priority") or "unknown") for item in merged_items)
+    merged = dict(shortlist)
+    merged["items"] = merged_items
+    merged["batches"] = merged_batches
+    merged["count"] = len(merged_items)
+    merged["priority_counts"] = dict(priority_counts)
+    merged["augment_count"] = augment_count
+    merged["augment_files"] = augment_files
+    merged["fallback_items"] = fallback_items
+    merged["fallback_batches"] = fallback_batches
+    merged["fallback_ratio"] = fallback_items / len(merged_items) if merged_items else 0.0
+    merged["endpoint_counts"] = dict(endpoint_counts)
+    merged["quality"] = {
+        **(quality if isinstance(quality, dict) else {}),
+        "expected_items": len(merged_items),
+        "batch_count": len(merged_batches),
+        "fallback_batches": fallback_batches,
+        "fallback_items": fallback_items,
+        "fallback_ratio": merged["fallback_ratio"],
+        "endpoint_counts": dict(endpoint_counts),
+        "fallback_errors": fallback_errors,
+    }
+    merged["selection_summary"] = _merged_selection_summary(merged_items, jobs, shortlist)
+    return merged
+
+
+def _merged_selection_summary(
+    items: list[dict[str, Any]],
+    jobs: list[dict[str, Any]],
+    shortlist: dict[str, Any],
+) -> dict[str, Any]:
+    base_selection = shortlist.get("selection_summary", {})
+    merged = dict(base_selection) if isinstance(base_selection, dict) else {}
+    job_by_id = {
+        str(job.get("stable_id") or ""): job
+        for job in jobs
+        if isinstance(job, dict) and job.get("stable_id")
+    }
+    item_ids = [str(item.get("stable_id") or "") for item in items if item.get("stable_id")]
+    selected_jobs = [job_by_id[stable_id] for stable_id in item_ids if stable_id in job_by_id]
+    merged["available_jobs"] = len(jobs)
+    merged["selected_jobs"] = len(items)
+    merged["available_vie"] = len([job for job in jobs if _is_vie_job(job)])
+    merged["selected_vie"] = len([job for job in selected_jobs if _is_vie_job(job)])
+    merged["selected_markets"] = dict(Counter(str(job.get("market") or "unknown") for job in selected_jobs))
+    merged["selected_sources"] = dict(Counter(str(job.get("source") or "unknown") for job in selected_jobs))
+    return merged
 
 
 def _read_fresh_job_artifact(artifact_path: Path, jobs_path: Path, jobs: list[dict[str, Any]]) -> dict[str, Any]:
@@ -218,16 +357,20 @@ def build_audit(
 
 def _application_queue_summary(application_queue: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(application_queue, dict) or not application_queue:
-        return {"available": False, "queue_count": 0, "start_date_counts": {}, "salary_counts": {}, "remote_counts": {}, "language_counts": {}, "remote_location_counts": {}}
+        return {"available": False, "queue_count": 0, "vie_queue_count": 0, "unjudged_watch_count": 0, "start_date_counts": {}, "salary_counts": {}, "remote_counts": {}, "language_counts": {}, "remote_location_counts": {}}
     items = [item for item in application_queue.get("items", []) if isinstance(item, dict)]
     return {
         "available": True,
         "queue_count": int(application_queue.get("queue_count", len(items)) or 0),
         "vie_queue_count": int(application_queue.get("vie_queue_count", 0) or 0),
+        "unjudged_watch_count": int(application_queue.get("unjudged_watch_count", 0) or 0),
+        "llm_augment_count": int(application_queue.get("llm_augment_count", 0) or 0),
         "status_counts": application_queue.get("queue_status_counts", {}),
         "priority_counts": application_queue.get("queue_priority_counts", {}),
         "vie_bucket_counts": application_queue.get("vie_queue_bucket_counts", {}),
         "vie_llm_counts": application_queue.get("vie_queue_llm_counts", {}),
+        "unjudged_watch_bucket_counts": application_queue.get("unjudged_watch_bucket_counts", {}),
+        "llm_augment_priority_counts": application_queue.get("llm_augment_priority_counts", {}),
         "start_date_counts": dict(Counter(str(item.get("last_start_date_check") or "unknown") for item in items)),
         "salary_counts": dict(Counter(str(item.get("last_salary_check") or "unknown") for item in items)),
         "remote_counts": dict(Counter(str(item.get("last_remote_check") or "unknown") for item in items)),
@@ -300,6 +443,7 @@ def _history_dashboard_summary(history_dashboard: dict[str, Any]) -> dict[str, A
         "expired_jobs",
         "queue_count",
         "vie_queue_count",
+        "unjudged_watch_count",
         "deltas_vs_previous",
     ]
     return {"available": True, **{key: history_dashboard.get(key) for key in keys}}
@@ -530,9 +674,21 @@ def _p_items(
         items.append({"priority": "P1", "item": f"Ouvrir manuellement {link_summary['browser_required']} lien(s) agregateur/protege(s) avant candidature."})
     if link_summary["available"] and (link_summary["needs_review"] or link_summary["server_error"]):
         count = int(link_summary["needs_review"]) + int(link_summary["server_error"])
-        items.append({"priority": "P1", "item": f"Verifier manuellement {count} lien(s) en statut needs_review/server_error avant candidature."})
+        statuses = [
+            status
+            for status in ("needs_review", "server_error")
+            if int(link_summary.get(status, 0) or 0)
+        ]
+        items.append({"priority": "P1", "item": f"Verifier manuellement {count} lien(s) en statut {'/'.join(statuses)} avant candidature."})
     items.append({"priority": "P1", "item": "Verifier manuellement salaire et remote avant candidature quand l'offre ne les publie pas."})
     queue_summary = _application_queue_summary(application_queue)
+    if int(queue_summary.get("unjudged_watch_count", 0) or 0):
+        items.append(
+            {
+                "priority": "P2",
+                "item": f"Revoir la lane watch non jugee ({queue_summary.get('unjudged_watch_count', 0)} item(s)): elle capture les signaux IA/data/software sous le top LLM sans les melanger a la queue principale.",
+            }
+        )
     start_counts = queue_summary.get("start_date_counts", {}) if queue_summary.get("available") else {}
     if int(start_counts.get("unknown", 0) or 0) or int(start_counts.get("too_soon", 0) or 0):
         items.append(
@@ -544,7 +700,7 @@ def _p_items(
     items.append(
         {
             "priority": "P2",
-            "item": "Utiliser deadline, language_check, remote_location_validity, required_years, experience_check et salary_normalized_annual_eur comme signaux soft; hard-filter seulement remote explicitement incompatible, langue locale obligatoire non compensee ou too_senior sans signal junior/all-levels.",
+            "item": "Utiliser deadline, language_check, remote_location_validity, required_years, experience_check et salary_normalized_annual_eur comme signaux soft; hard-filter seulement remote explicitement incompatible, langue locale obligatoire non compensee ou too_senior sans override LLM junior_ok/stretch.",
         }
     )
     if "vdab_generic" in skipped:
@@ -677,6 +833,13 @@ def _audit_markdown(report: dict[str, Any]) -> str:
         lines.append(
             f"- Lane VIE dediee: **{queue.get('vie_queue_count', 0)}** | buckets: `{queue.get('vie_bucket_counts', {})}` | LLM: `{queue.get('vie_llm_counts', {})}`"
         )
+        lines.append(
+            f"- Lane watch non jugee: **{queue.get('unjudged_watch_count', 0)}** | buckets: `{queue.get('unjudged_watch_bucket_counts', {})}`"
+        )
+        if int(queue.get("llm_augment_count", 0) or 0):
+            lines.append(
+                f"- Augments LLM cibles: **{queue.get('llm_augment_count', 0)}** | priorites: `{queue.get('llm_augment_priority_counts', {})}`"
+            )
         lines.append(
             f"- Checks queue: start `{queue.get('start_date_counts', {})}` | salaire `{queue.get('salary_counts', {})}` | remote `{queue.get('remote_counts', {})}` | langue `{queue.get('language_counts', {})}` | remote/localisation `{queue.get('remote_location_counts', {})}`"
         )

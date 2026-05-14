@@ -24,16 +24,18 @@ Le projet est volontairement local et humain-dans-la-boucle:
 
 ## Etat Court
 
-Dernier full run valide documente: **2026-05-10 19:26 Europe/Paris**. Derniere regeneration queue/audit: **2026-05-10 20:00 Europe/Paris**.
+Dernier full run valide documente: **2026-05-10 19:26 Europe/Paris**. Derniere regeneration queue/audit/liens: **2026-05-11 17:31 Europe/Paris**, sous `20260511-170036-hard-audit-residual7-final`, apres onze augments LLM cibles sur les VIE, la watch non jugee, les poches rescue non-VIE et les residuels manuels/entreprises a risque de faux negatif.
 
 - 5493 offres retenues.
 - 58 sources OK, 2 sources ignorees attendues, 0 erreur.
 - 509 missions VIE Business France.
-- 1200 offres jugees par le LLM en mode `wide`, effort `medium`, batch 10, concurrence 1.
-- Quality gate LLM stricte: 0 `fallback_default` / 1200; transport `auto` via OpenAI SDK + `base_url` codexlb, fallback REST controle.
-- 555 liens verifies en mode priority-aware.
-- 300 items dans la queue multi-run dedupee, triee par priorite LLM puis `COALESCE(last_combined_score, score)`.
-- 240 missions dans `vie_priority_queue.md/json`, dont 77 deja jugees LLM et 163 VIE techniques non jugees a garder en veille.
+- 2733 jugements LLM exploites: 1200 en base `wide` + 1533 augments cibles, batch 10/concurrence 1 sur la base large; les passes cibles gardent fallback interdit.
+- Quality gate LLM stricte: 0 `fallback_default` / 2733; transport `auto` via OpenAI SDK + `base_url` codexlb, fallback REST controle; la derniere passe residual7 a utilise `raw`/effort `low` pour eviter un blocage SDK.
+- 1318 liens verifies en mode priority-aware, incluant les augments.
+- 300 items dans la queue multi-run dedupee: 86 `apply_now`, 214 `shortlist`, triee par priorite LLM puis `COALESCE(last_combined_score, score)`.
+- 170 missions dans `vie_priority_queue.md/json`, toutes jugees LLM: 2 `apply_now`, 50 `shortlist`, 118 `maybe`.
+- 0 offre restante dans `unjudged_watch_queue.md/json`: les 79 signaux IA/data/software detectes ont ete juges dans l'augment cible.
+- 0 VIE-like non juge restant; 2760 offres non jugees LLM restent dans le corpus. Apres residual7, il ne reste pas de bucket actionnable A/B detecte; le residuel strict est **271 weak-signal** et **2489 low-signal/noise**, pas une certitude absolue que chaque item est du bruit.
 - Tache Windows `JobRadarAI-Daily`: **desactivee**.
 
 Le full run inclut les extensions ajoutees pendant l'audit: Bundesagentur Jobsuche, SmartRecruiters durci, Delivery Hero filtre, correction du matching marche par alias bornes, JobTechDev Sweden, NAV Arbeidsplassen Norway, EURAXESS, Doctorat.gouv.fr, AcademicTransfer, WeWorkRemotely RSS, SwissDevJobs, GermanTechJobs, champs structures `deadline`/`language_check`/`remote_location_validity`/`required_years`/`experience_check`/salaire annualise EUR, extension graduate/early-career/doctorat industriel-CIFRE, et extension opportuniste Autriche/Nordics/Espagne/Portugal/Estonie/Pologne/Tchequie.
@@ -111,6 +113,7 @@ Pour rapatrier les statuts/notes saisis dans l'interface:
 - `runs/latest/`: exports du dernier run, ignore par git.
 - `runs/history/job_history.sqlite`: ledger multi-run, ignore par git.
 - `runs/latest/vie_priority_queue.md`: lane VIE separee pour ne pas comparer une indemnite VIE a un brut CDI.
+- `runs/latest/unjudged_watch_queue.md`: lane de surveillance pour les offres non jugees LLM mais potentiellement interessantes; vide sur l'etat courant apres augment cible.
 
 Les credentials restent dans `config/.env` ou variables d'environnement, jamais dans le code.
 
@@ -130,7 +133,8 @@ Voir [docs/SOURCES.md](docs/SOURCES.md) pour le detail.
 - Les exports gardent les raisons de scoring.
 - `start_date_check` reste un signal soft: confirmer avec RH, ne pas auto-skipper.
 - Les VIE sont exposees dans une lane dediee; la queue principale reste CDI/VIE mixte mais n'est plus le seul endroit ou regarder les VIE.
-- `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et la normalisation devise/salaire sont des signaux de priorisation, pas des hard filters aveugles; seul `experience_check=too_senior` deterministe sort de la queue actionnable sauf override LLM `junior_ok`.
+- Les offres non jugees LLM mais a fort signal IA/data/software sont exposees dans `unjudged_watch_queue.md`; sur l'etat courant cette lane est vide, mais elle evite qu'un futur `JudgeLimit` recree un angle mort silencieux.
+- `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et la normalisation devise/salaire sont des signaux de priorisation, pas des hard filters aveugles; `experience_check=too_senior` deterministe sort de la queue actionnable sauf override LLM `junior_ok` ou `stretch`.
 - Les offres PhD/doctorat sont opportunistes: un CIFRE/industrial PhD data/AI/R&D peut etre shortlist, mais un doctorat academique sans entreprise, salaire ou fit technique clair reste a verifier ou low-fit.
 - Le judge LLM passe par l'OpenAI SDK en mode `auto` quand disponible, avec `base_url` custom codexlb, sortie JSON Schema stricte, fallback REST controle et quality gate: un run avec trop de `fallback_default` echoue au lieu de polluer la queue.
 - Le judge LLM aide a prioriser, mais ne remplace pas la verification humaine avant candidature.

@@ -1,6 +1,6 @@
 # Audit Best Practice
 
-Derniere mise a jour: **2026-05-10**.
+Derniere mise a jour: **2026-05-11**.
 
 ## Verdict
 
@@ -17,25 +17,27 @@ Une interface web privee est aussi deployee sous `https://jobs.raphcvr.me` pour 
 
 ## Etat Runtime Valide
 
-Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**. Queue/history/audit regeneres apres correctif VIE le **2026-05-10 20:00 Europe/Paris**.
+Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**. Onze augments LLM cibles, correction France Travail HTTP 409, verification liens, queue/history et audit regeneres apres correctifs cibles le **2026-05-11 17:58 Europe/Paris**.
 
 - 5493 offres retenues.
 - 58 sources OK.
 - 2 skips attendus: Adzuna sans credentials, JobSpy API local injoignable.
 - 0 erreur source.
 - 509 VIE retenus.
-- 1200 offres jugees par le LLM en `wide`, effort `medium`, batch 10, concurrence 1.
-- Qualite LLM: 0 `fallback_default` / 1200, transport `auto` via OpenAI SDK + `base_url` codexlb, fallback REST controle.
-- 555 liens verifies en mode priority-aware.
-- Snapshot: `runs/history/20260510-173933-vie-fix`.
+- 2733 jugements LLM exploites: 1200 en base `wide` + 1533 augments cibles, 0 fallback; la base reste `medium`/batch 10/concurrence 1, et residual7 a ete force en `raw`/effort `low` apres blocage SDK.
+- Qualite LLM: 0 `fallback_default` / 2733, transport `auto` via OpenAI SDK + `base_url` codexlb, fallback REST controle.
+- 1318 liens verifies en mode priority-aware: 732 `direct_ok`, 570 `browser_required`, 0 `needs_review`, 13 `expired`, 2 `unreachable`, 1 `server_error`.
+- Snapshot: `runs/history/20260511-170036-hard-audit-residual7-final-consistent`.
 - Registre multi-run: `runs/history/job_history.sqlite`.
 - Queue dedupee: `runs/latest/application_queue.md`, 300 items actifs apres rebaseline fresh, triee par priorite LLM puis `COALESCE(last_combined_score, score)`.
-- Lane VIE dediee: `runs/latest/vie_priority_queue.md`, 240 missions priorisees dont 77 deja jugees LLM et 163 VIE techniques non jugees.
-- Historique: 5493 offres courantes, 5493 connues, 0 absente/stale/expired dans le ledger fresh.
+- Lane VIE dediee: `runs/latest/vie_priority_queue.md`, 170 missions priorisees, toutes jugees LLM: 2 `apply_now`, 50 `shortlist`, 118 `maybe`.
+- Lane watch non jugee: `runs/latest/unjudged_watch_queue.md`, 0 offre restante apres augment cible; les signaux Mistral, LangChain, Poolside, DeepMind, Canonical, Cohere, OpenAI et autres ont ete juges.
+- Rescue non-VIE + passes manuelles residuelles: 1103 offres reperees par audit titre/source/entreprise/doctorat jugees, 0 fallback, resultat 43 `apply_now`, 260 `shortlist`, 303 `maybe`, 497 `skip`; residuel VIE-like non juge: 0; buckets residuels actionnables A/B: 0 apres residual7.
+- Historique: 5493 offres courantes, 5493 connues, 0 missing, 52 returned jobs au dernier sync.
 - Audit dedupe 2026-05-09: le gros ecart apparent venait surtout du cumul `stale` et d'un churn Jooble cause par des parametres d'URL volatils; les IDs stables canonisent maintenant les liens Jooble.
 - Audit sources 2026-05-10: les autres sources a delta ou zero count ont ete verifiees. Aucun autre faux-churn d'ID detecte; Jobicy avait seulement une strategie tag trop stricte et utilise maintenant un fallback global filtre localement. GermanTechJobs n'etait pas casse, mais le cap RSS `400` etait trop bas pour un flux live >2000 items; il passe a `1200`. France Travail pagine maintenant `3 x 50` resultats par requete et inclut `data scientist`/France data/MDM; smoke live apres correctif: **1231** IDs uniques, **10/10** anciennes absentes retrouvees, **189** offres >= 60 de score.
 - P0: aucun blocage runtime detecte.
-- Plateforme web: `jobradarai-web` Running 1/1 sur Kubernetes, image `ghcr.io/raphcvr/jobradarai-web:sha-0014aed`, ingress `jobs.raphcvr.me`, HTTPS `/api/health` OK, PVC synchronise avec `run_name=20260510-173933`, `queue_count=300`, `llm_count=1200`.
+- Plateforme web: `jobradarai-web` Running 1/1 sur Kubernetes, image `ghcr.io/raphcvr/jobradarai-web:sha-5ca3919`, ingress `jobs.raphcvr.me`, HTTPS `/api/health` OK, PVC synchronise avec `queue_count=300`, `queue_priority_counts={'apply_now': 86, 'shortlist': 214}`, `vie_queue_count=170`, `unjudged_watch_count=0`, `llm_augment_count=1533`, `link_checked_count=1318`.
 
 ## Repos Et Systemes Audites
 
@@ -96,13 +98,16 @@ Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**. Qu
 - Le script quotidien synchronise un ledger multi-run dedupe entre les liens et l'audit.
 - `runs/latest/jobs.sqlite` reste un snapshot du run courant; les offres pertinentes anciennes sont conservees dans `runs/history/job_history.sqlite` avec `first_seen`, `last_seen`, `seen_count`, `absent_count`, `presence_status`, dernier statut lien et derniere priorite LLM.
 - La queue expose `start_date_check = compatible | too_soon | unknown` comme signal soft, plus `vie_priority_queue.md`, `application_messages.md`, `history_dashboard.md` et `weekly_digest.md`.
+- La queue expose aussi `unjudged_watch_queue.md` pour eviter qu'une offre non jugee LLM mais a gros signal IA/data/software disparaisse derriere la limite `JudgeLimit`.
 - La queue, le judge, l'audit, les exports et SQLite exposent aussi `deadline`, `language_check`, `remote_location_validity` et `salary_normalized_annual_eur`.
-- Le judge recoit aussi `required_years`, `experience_check` et `experience_evidence`; les `too_senior` LLM ou deterministes sont retires de la queue actionnable sauf override LLM `junior_ok`, tandis que les cas `stretch` restent visibles.
+- Le judge recoit aussi `required_years`, `experience_check` et `experience_evidence`; les `too_senior` LLM ou deterministes sont retires de la queue actionnable sauf override LLM `junior_ok` ou `stretch`, avec verification humaine pour les cas limites.
 - Le scoring expose `doctoral_scope`: bonus leger pour CIFRE/industrial PhD, penalite explicite pour doctorat academique sans salaire/entreprise clair. Cela garde les PhD utiles visibles sans les laisser depasser les jobs/VIE/graduate mieux alignes.
 - Les salaires non EUR sont normalises en estimation annuelle EUR pour le tri, sans masquer la devise d'origine.
 - Les remote US-only/localisation incompatible sont penalises; les cas `restricted` restent en verification humaine.
 - Le judge LLM logge la progression par batch et `run_daily.ps1` expose `-JudgeTimeoutSeconds`/`-JudgeConcurrency`/`-JudgeTransport`/`-JudgeMaxFallbackRatio`. Le calibrage codexlb actuel montre que concurrence 1 est le default prod; concurrence 2 est plus lente au smoke et concurrence 5 peut saturer la file `responses session bridge`. Batch 10 est le compromis valide; batch 20 a ete plus lent et a degrade le transport.
-- Le judge supprime les anciennes shortlists avant execution et echoue si le taux de `fallback_default` depasse le seuil configure; le rebaseline 2026-05-10 a ete lance avec seuil strict 0 et a termine a 0/1200.
+- Le judge supprime les anciennes shortlists avant execution et echoue si le taux de `fallback_default` depasse le seuil configure; le rebaseline 2026-05-10 a ete lance avec seuil strict 0 et a termine a 0/1200, puis les augments cibles ont termine a 0/1533.
+- `verify-links` lit aussi `runs/latest/llm_augments/*.json`; une passe LLM ciblee ne peut plus ajouter des offres actionnables sans les envoyer au link-check.
+- France Travail HTTP 409 est traite comme `browser_required`, car `candidat.francetravail.fr` exige une verification navigateur/anti-bot; cela evite de transformer un comportement attendu en faux `needs_review`.
 - Les exports CSV neutralisent les formules Excel et le dashboard n'accepte que des liens HTTP(S).
 - Les erreurs HTTP redigent secrets en query/path/body.
 - LinkedIn non automatise en masse.
@@ -113,12 +118,13 @@ Dernier full run complet valide documente: **2026-05-10 19:26 Europe/Paris**. Qu
 ## Reste A Faire
 
 - `P0`: aucun blocage runtime detecte sur le dernier run complet.
-- `P1`: verifier manuellement les 206 liens `browser_required` avant candidature, surtout Indeed/JobSpy et pages protegees/anti-bot.
-- `P1`: verifier manuellement les 42 liens `needs_review` et le 1 `server_error` avant candidature.
+- `P1`: verifier manuellement les 570 liens `browser_required` avant candidature, surtout Indeed/JobSpy, France Travail HTTP 409 et pages protegees/anti-bot.
+- `P1`: verifier manuellement les 13 liens `expired`, les 2 `unreachable` et le 1 `server_error` si tu veux recuperer des offres hors queue. Il reste 0 `needs_review`.
 - `P1`: verifier manuellement salaire et remote quand l'offre ne publie pas l'information ou quand le LLM marque `unknown`/`weak`.
 - `P2`: confirmer avec RH les dates de demarrage `unknown`/`too_soon`; ne pas filtrer automatiquement sur ce signal.
 - `P2`: exploiter `vie_priority_queue.md` pour les arbitrages VIE; la queue principale ne doit plus etre le seul filtre de decision sur cette voie.
-- `P2`: traiter `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux de tri et de verification; `too_senior` doit rester hors queue actionnable sauf override LLM junior/all-levels explicite.
+- `P2`: conserver `unjudged_watch_queue.md` comme garde-fou de futurs runs; sur l'etat courant elle est vide apres augment LLM cible.
+- `P2`: traiter `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux de tri et de verification; `too_senior` doit rester hors queue actionnable sauf override LLM `junior_ok`/`stretch` explicite.
 - `P2/P3`: surveiller sur les prochains runs le bruit apporte par `Analytics Engineer` et `Applied Scientist`; le premier full run post-extension est correct, mais ces titres doivent rester sous garde-fous niveau/experience.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
 - `P2`: apres chaque gros run local, synchroniser la plateforme web avec `scripts/sync_web_data.ps1`; ne copier `runs/state/application_state.json` qu'en migration explicite.

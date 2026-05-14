@@ -226,7 +226,29 @@ class HistoryTests(unittest.TestCase):
             result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
             self.assertFalse(any(item["stable_id"] == job["stable_id"] for item in result["items"]))
 
-    def test_sync_history_excludes_deterministic_too_senior_items_from_queue(self) -> None:
+    def test_sync_history_excludes_deterministic_too_senior_items_without_llm_override(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "latest"
+            output.mkdir()
+            history_db = root / "history" / "job_history.sqlite"
+            job = Job(
+                source="ATS",
+                source_type="ats",
+                title="Applied AI Engineer",
+                company="Acme",
+                url="https://jobs.example.com/applied-ai",
+                market="france",
+                score=86,
+                required_years=7,
+                experience_check="too_senior",
+                experience_evidence="7 years of professional experience",
+            ).as_dict()
+            self._write_run(output, [job], shortlist_items=[])
+            result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
+            self.assertFalse(any(item["stable_id"] == job["stable_id"] for item in result["items"]))
+
+    def test_sync_history_keeps_deterministic_too_senior_when_llm_marks_stretch(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             output = root / "latest"
@@ -257,7 +279,7 @@ class HistoryTests(unittest.TestCase):
                 ],
             )
             result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
-            self.assertFalse(any(item["stable_id"] == job["stable_id"] for item in result["items"]))
+            self.assertTrue(any(item["stable_id"] == job["stable_id"] for item in result["items"]))
 
     def test_sync_history_keeps_stretch_items_with_moderate_required_years(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -341,6 +363,7 @@ class HistoryTests(unittest.TestCase):
                 location="Barcelone",
                 salary="Indemnite VIE mensuelle 2676.00 EUR",
                 employment_type="VIE 12 mois",
+                description="Monthly reporting team in a group with 60 000 employees and 42.6 billion EUR revenue.",
                 score=54,
             ).as_dict()
             unjudged_vie = Job(
@@ -373,10 +396,133 @@ class HistoryTests(unittest.TestCase):
             buckets = {item["stable_id"]: item["vie_bucket"] for item in result["vie_items"]}
             self.assertEqual(buckets[judged_vie["stable_id"]], "shortlist")
             self.assertEqual(buckets[unjudged_vie["stable_id"]], "unjudged_technical")
+            allowances = {item["stable_id"]: item["vie_monthly_allowance_eur"] for item in result["vie_items"]}
+            self.assertEqual(allowances[judged_vie["stable_id"]], 2676.0)
             self.assertTrue((output / "vie_priority_queue.md").exists())
             vie_md = (output / "vie_priority_queue.md").read_text(encoding="utf-8")
             self.assertIn("Data Analyst - Strategic Partnerships", vie_md)
             self.assertIn("Data Management & Analytical Method Lifecycle", vie_md)
+
+    def test_sync_history_writes_unjudged_watch_queue(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "latest"
+            output.mkdir()
+            history_db = root / "history" / "job_history.sqlite"
+            core_watch = Job(
+                source="Mistral AI",
+                source_type="ats",
+                title="Software Engineer, Enterprise Agents",
+                company="Mistral AI",
+                url="https://jobs.example.com/mistral-agents",
+                market="france",
+                description="Build agentic enterprise products with Python, cloud and LLM systems.",
+                score=58,
+            ).as_dict()
+            strategy_watch = Job(
+                source="Mistral AI",
+                source_type="ats",
+                title="AI Deployment Strategist - Paris",
+                company="Mistral AI",
+                url="https://jobs.example.com/mistral-strategist",
+                market="france",
+                description="Customer-facing deployment role around LLM systems.",
+                score=59,
+            ).as_dict()
+            acronym_watch = Job(
+                source="Google DeepMind",
+                source_type="ats",
+                title="SWE - Grids - Fixed Term Contract - 6 Months",
+                company="Google DeepMind",
+                url="https://jobs.example.com/deepmind-swe",
+                market="uk",
+                description="Software engineering for ML-backed power grid systems.",
+                score=58,
+            ).as_dict()
+            senior = Job(
+                source="Anthropic",
+                source_type="ats",
+                title="Senior Software Engineer, Agents",
+                company="Anthropic",
+                url="https://jobs.example.com/senior-agents",
+                market="uk",
+                score=59,
+            ).as_dict()
+            self._write_run(output, [core_watch, strategy_watch, acronym_watch, senior], shortlist_items=[])
+            result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
+            self.assertEqual(result["unjudged_watch_count"], 3)
+            buckets = {item["stable_id"]: item["watch_bucket"] for item in result["unjudged_watch_items"]}
+            self.assertEqual(buckets[core_watch["stable_id"]], "core_watch")
+            self.assertEqual(buckets[strategy_watch["stable_id"]], "ai_strategy_watch")
+            self.assertEqual(buckets[acronym_watch["stable_id"]], "core_watch")
+            self.assertFalse(any(item["stable_id"] == senior["stable_id"] for item in result["unjudged_watch_items"]))
+            watch_md = (output / "unjudged_watch_queue.md").read_text(encoding="utf-8")
+            self.assertIn("Software Engineer, Enterprise Agents", watch_md)
+            self.assertIn("AI Deployment Strategist - Paris", watch_md)
+            self.assertIn("SWE - Grids", watch_md)
+
+    def test_sync_history_uses_llm_augments_without_replacing_base_shortlist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output = root / "latest"
+            output.mkdir()
+            history_db = root / "history" / "job_history.sqlite"
+            base_job = Job(
+                source="ATS",
+                source_type="ats",
+                title="Applied AI Engineer",
+                company="Base",
+                url="https://jobs.example.com/base",
+                market="france",
+                score=80,
+            ).as_dict()
+            augmented_job = Job(
+                source="ATS",
+                source_type="ats",
+                title="Software Engineer, Enterprise Agents",
+                company="Augmented",
+                url="https://jobs.example.com/augmented",
+                market="france",
+                score=58,
+            ).as_dict()
+            self._write_run(
+                output,
+                [base_job, augmented_job],
+                shortlist_items=[
+                    {
+                        "stable_id": base_job["stable_id"],
+                        "priority": "shortlist",
+                        "combined_score": 82,
+                        "level_fit": "junior_ok",
+                    }
+                ],
+            )
+            augment_dir = output / "llm_augments"
+            augment_dir.mkdir()
+            (augment_dir / "targeted.json").write_text(
+                json.dumps(
+                    {
+                        "items": [
+                            {
+                                "stable_id": augmented_job["stable_id"],
+                                "priority": "apply_now",
+                                "combined_score": 90,
+                                "level_fit": "stretch",
+                            }
+                        ]
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            result = sync_history(output_dir=output, history_db=history_db, run_name="run-1", recheck_stale_limit=0)
+            priorities = {item["stable_id"]: item["queue_bucket"] for item in result["items"]}
+            self.assertEqual(priorities[base_job["stable_id"]], "shortlist")
+            self.assertEqual(priorities[augmented_job["stable_id"]], "apply_now")
+            self.assertEqual(result["llm_augment_count"], 1)
+            self.assertEqual(result["llm_augment_priority_counts"], {"apply_now": 1})
+            queue_md = (output / "application_queue.md").read_text(encoding="utf-8")
+            self.assertIn("Augments LLM cibles: **1**", queue_md)
 
     def _write_run(self, output: Path, jobs: list[dict], shortlist_items: list[dict]) -> None:
         (output / "jobs.json").write_text(json.dumps(jobs, ensure_ascii=False), encoding="utf-8")

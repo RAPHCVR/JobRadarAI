@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import html
 import json
+import shutil
 import urllib.parse
 from collections import Counter, defaultdict
 from dataclasses import asdict
@@ -37,6 +38,8 @@ def _remove_stale_llm_outputs(output_dir: Path) -> None:
         "application_queue.md",
         "vie_priority_queue.json",
         "vie_priority_queue.md",
+        "unjudged_watch_queue.json",
+        "unjudged_watch_queue.md",
         "application_messages.json",
         "application_messages.md",
         "history_dashboard.json",
@@ -48,7 +51,13 @@ def _remove_stale_llm_outputs(output_dir: Path) -> None:
     ):
         path = output_dir / name
         if path.exists():
-            path.unlink()
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+    augment_dir = output_dir / "llm_augments"
+    if augment_dir.exists():
+        shutil.rmtree(augment_dir)
 
 
 def _write_json(path: Path, jobs: list[Job]) -> None:

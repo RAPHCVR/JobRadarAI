@@ -201,6 +201,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"history_db={result['history_db']}")
         print(f"queue={output / 'application_queue.md'}")
         print(f"vie_queue={output / 'vie_priority_queue.md'}")
+        print(f"unjudged_watch={output / 'unjudged_watch_queue.md'}")
         print(f"messages={output / 'application_messages.md'}")
         print(f"dashboard={output / 'history_dashboard.md'}")
         print(f"digest={output / 'weekly_digest.md'}")
@@ -216,6 +217,7 @@ def main(argv: list[str] | None = None) -> int:
                     "rechecked_stale": result["rechecked_stale"],
                     "queue_count": result["queue_count"],
                     "vie_queue_count": result.get("vie_queue_count", 0),
+                    "unjudged_watch_count": result.get("unjudged_watch_count", 0),
                 },
                 ensure_ascii=False,
                 sort_keys=True,

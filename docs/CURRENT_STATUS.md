@@ -1,8 +1,8 @@
 # Etat Courant
 
-Derniere validation run: **2026-05-10 20:00 Europe/Paris**, full rebaseline manuel `20260510-173933` conserve, puis regeneration queue/history/audit apres correctif VIE.
+Derniere validation run: **2026-05-11 17:58 Europe/Paris**, full rebaseline manuel `20260510-173933` conserve, puis onze augments LLM cibles, correction France Travail HTTP 409 en `browser_required`, verification liens, queue/history et audit regeneres sous `20260511-170036-hard-audit-residual7-final`.
 
-Derniere validation plateforme web: **2026-05-10 20:07 Europe/Paris**, image `ghcr.io/raphcvr/jobradarai-web:sha-5ca3919` deployee et `runs/latest` synchronise sur Kubernetes sous `https://jobs.raphcvr.me`.
+Derniere validation plateforme web: **2026-05-11 17:58 Europe/Paris**, image `ghcr.io/raphcvr/jobradarai-web:sha-5ca3919` deployee, `runs/latest` resynchronise puis audit final recopie sur Kubernetes sous `https://jobs.raphcvr.me`.
 
 Commande utilisee pour la base large:
 
@@ -27,17 +27,21 @@ Commande utilisee pour la base large:
 - Salaires normalises EUR/an: **893**.
 - Annees d'experience extraites: **1285**.
 - VIE Business France retenus: **509**, indemnite mensuelle observee **2610** a **4427** EUR.
-- Judge LLM: **1200** offres jugees en mode `wide`, effort `medium`, batch 10, concurrence 1.
+- Judge LLM base: **1200** offres jugees en mode `wide`, effort `medium`, batch 10, concurrence 1.
+- Augments LLM cibles: **1533** offres jugees en plus, dont **430** watch/VIE techniques, **303** rescue non-VIE titre/source et **800** residuels manuels/entreprises/doctorats a risque de faux negatif.
+- Total LLM exploite par la queue et les exports: **2733** jugements uniques.
 - Transport LLM: `auto` via OpenAI SDK quand possible, `base_url=https://codex.raphcvr.me/v1`.
-- Qualite LLM: **0 fallback_default / 1200**, quality gate stricte `-JudgeMaxFallbackRatio 0`.
-- Endpoints LLM: **117** batchs `responses_sdk`, **4** batchs fallback REST `responses`, aucun fallback de jugement.
-- Verification liens: **555** liens verifies.
+- Qualite LLM: **0 fallback_default / 2733**, quality gate stricte `-JudgeMaxFallbackRatio 0`.
+- Endpoints LLM base: **117** batchs `responses_sdk`, **4** batchs fallback REST `responses`, aucun fallback de jugement. Les augments cibles ont aussi termine a **0 fallback**; residual7 a ete force en `raw`/effort `low` apres blocage SDK et a traite 120/120 offres.
+- Verification liens: **1318** liens verifies, **732** `direct_ok`, **570** `browser_required`, **0** `needs_review`, **13** `expired`, **2** `unreachable`, **1** `server_error`.
 - Queue multi-run: **300** items dedupes, tous `active`, triee par priorite LLM puis `COALESCE(last_combined_score, score)`.
-- Lane VIE dediee: **240** missions priorisees, dont **77** deja jugees LLM et **163** VIE techniques non jugees.
-- Snapshot final: `runs/history/20260510-173933-vie-fix`.
-- Registre multi-run: `runs/history/job_history.sqlite`, fresh rebaseline, **5493** offres connues, **0** missing/stale/expired au demarrage.
+- Lane VIE dediee: **170** missions priorisees, toutes jugees LLM, buckets **2** `apply_now`, **50** `shortlist`, **118** `maybe`.
+- Lane watch non jugee: **0** offre restante; les **79** offres techniques/IA/data reperees ont ete traitees par augment LLM cible.
+- Rescue non-VIE + passes manuelles residuelles: **1103** offres reperees par audit titre/source/entreprise/doctorat jugees; **43** `apply_now`, **260** `shortlist`, **303** `maybe`, **497** `skip`; residuel VIE-like non juge: **0**; buckets residuels actionnables A/B: **0** apres residual7.
+- Snapshot final: `runs/history/20260511-170036-hard-audit-residual7-final-consistent`.
+- Registre multi-run: `runs/history/job_history.sqlite`, fresh rebaseline, **5493** offres connues, **0** missing, **52** returned jobs au dernier sync, dernier sync `20260511-170036-hard-audit-residual7-final`.
 - Tache Windows: `JobRadarAI-Daily` **desactivee**.
-- Plateforme web: pod `jobradarai-web` **Running 1/1**, image `sha-5ca3919`, HTTPS `/api/health` OK, PVC synchronise avec `run_name=20260510-173933`, `queue_count=300`, `vie_queue_count=240`, `llm_count=1200`.
+- Plateforme web: pod `jobradarai-web` **Running 1/1**, image `sha-5ca3919`, HTTPS `/api/health` OK, PVC synchronise avec `queue_count=300`, `queue_priority_counts={'apply_now': 86, 'shortlist': 214}`, `vie_queue_count=170`, `unjudged_watch_count=0`, `llm_augment_count=1533`, `link_checked_count=1318`.
 
 Exports principaux:
 
@@ -48,6 +52,7 @@ Exports principaux:
 - Verification liens: `runs/latest/link_checks.md`.
 - Queue multi-run: `runs/latest/application_queue.md`.
 - Lane VIE dediee: `runs/latest/vie_priority_queue.md`.
+- Lane watch non jugee: `runs/latest/unjudged_watch_queue.md`.
 - Messages RH brouillons: `runs/latest/application_messages.md`.
 - Dashboard historique: `runs/latest/history_dashboard.md`.
 - Weekly digest: `runs/latest/weekly_digest.md`.
@@ -114,13 +119,16 @@ Bandes de score:
 
 ## Shortlist LLM
 
-- Offres jugees: **1200** / 5493.
+- Offres jugees base: **1200** / 5493.
 - Selection: `wide`.
 - Priorites: **42** `apply_now`, **299** `shortlist`, **214** `maybe`, **645** `skip`.
-- VIE selectionnes: **158** / 509.
+- Augments cibles: **1533** jugements additionnels, priorites **44** `apply_now`, **311** `shortlist`, **408** `maybe`, **770** `skip`.
+- Total exploite par la queue et les exports: **2733** jugements uniques, **0** fallback.
+- VIE juges: **509** / 509.
 - Early-career/graduate/doctoral cible selectionne: **53** / 61.
 - Poids de classement final: **40%** score local, **60%** `fit_score` LLM.
 - Le rerank est maintenant beaucoup plus large que l'ancien `balanced 200`: il couvre le signal >= 60 puis complete avec VIE, graduate/doctoral et couverture marche.
+- Augment notable: Mistral AI `Applied AI, Fullstack Software Engineer, Critical and Sovereign Institutions, Paris` est maintenant `apply_now`; Mistral `Software Engineer, Enterprise Agents` est `shortlist`.
 
 Top `apply_now` du run:
 
@@ -139,32 +147,34 @@ Top `apply_now` du run:
 
 - Queue dedupee: **300**.
 - Statuts: **300** `active`, **0** `stale`, **0** `expired` dans la queue.
-- Priorites queue: **42** `apply_now`, **258** `shortlist`.
-- VIE dans la queue principale: **17**.
-- Lane VIE dediee: **240** items, buckets **2** `apply_now`, **27** `shortlist`, **48** `maybe`, **163** `unjudged_technical`.
-- Liens queue: **151** `direct_ok`, **116** `browser_required`, **33** `needs_review`.
-- Niveau LLM: **114** `junior_ok`, **162** `stretch`, **24** `unknown`, **0** `too_senior`.
-- Experience deterministe dans la queue: **21** `junior_ok`, **22** `stretch`, **257** `unknown`, **0** `too_senior`; **23** items exposent `required_years`.
+- Priorites queue: **86** `apply_now`, **214** `shortlist`.
+- VIE dans la queue principale: **11**.
+- Lane VIE dediee: **170** items, buckets **2** `apply_now`, **50** `shortlist`, **118** `maybe`, **0** non juge.
+- Lane watch non jugee: **0** item.
+- Augments LLM cibles integres: **1533** jugements, priorites **44** `apply_now`, **311** `shortlist`, **408** `maybe`, **770** `skip`.
+- Liens queue: **136** `direct_ok`, **164** `browser_required`, **0** `needs_review`.
+- Niveau LLM: **124** `junior_ok`, **159** `stretch`, **17** `unknown`, **0** `too_senior`.
+- Experience deterministe dans la queue: **22** `junior_ok`, **18** `stretch`, **258** `unknown`, **2** `too_senior` a verifier manuellement; **21** items exposent `required_years`.
 
 Checks queue:
 
-- `start_date_check`: 274 `unknown`, 14 `too_soon`, 12 `compatible`.
-- Salaire: 141 `meets_or_likely`, 114 `unknown`, 45 `below_min`.
-- Remote: 88 `meets`, 207 `weak`, 5 `unknown`.
-- Langue: 71 `english_ok`, 26 `french_ok`, 12 `local_language_required`, 191 `unknown`.
-- Remote/localisation: 292 `compatible`, 8 `restricted`, 0 `incompatible`.
+- `start_date_check`: 256 `unknown`, 35 `compatible`, 9 `too_soon`.
+- Salaire: 140 `meets_or_likely`, 110 `unknown`, 50 `below_min`.
+- Remote: 87 `meets`, 205 `weak`, 8 `unknown`.
+- Langue: 66 `english_ok`, 41 `french_ok`, 6 `local_language_required`, 187 `unknown`.
+- Remote/localisation: 291 `compatible`, 9 `restricted`, 0 `incompatible`.
 
 ## Liens
 
-- Liens verifies: **555**.
-- `direct_ok`: **306**.
-- `browser_required`: **206**.
-- `needs_review`: **42**.
+- Liens verifies: **1318**.
+- `direct_ok`: **732**.
+- `browser_required`: **570**.
+- `needs_review`: **0**.
 - `server_error`: **1**.
-- `expired`: **0**.
-- `unreachable`: **0**.
+- `expired`: **13**.
+- `unreachable`: **2**.
 
-Interpretation: les liens `browser_required` ne sont pas des echecs systeme; ce sont surtout des agregateurs/anti-bot/pages protegees a ouvrir dans un navigateur avant candidature. Les `needs_review` et le `server_error` doivent etre confirmes avant candidature.
+Interpretation: les liens `browser_required` ne sont pas des echecs systeme; ce sont surtout des agregateurs/anti-bot/pages protegees a ouvrir dans un navigateur avant candidature. Les anciens France Travail HTTP 409 sont maintenant classes dans ce bucket, ce qui evite de polluer `needs_review`. Les `expired`, `unreachable` et `server_error` restants sont hors queue actionnable, mais restent a confirmer si tu tombes dessus.
 
 ## Graduate / Early Careers / Doctoral
 
@@ -201,16 +211,23 @@ Verdict: la couche marche et reste correctement secondaire. Elle capture les gra
 - `openai>=2.0.0` ajoute aux dependances et lockfile mis a jour.
 - Audit expose maintenant transport/endpoint/fallback/priorites LLM.
 - Docs et scripts mis a jour avec `wide 1200`, SDK/codexlb, batch 10, concurrence 1, effort medium.
+- History/link-check lisent maintenant aussi `runs/latest/llm_augments/*.json`; les runs cibles ne creent donc plus d'angle mort lien ou queue.
+- France Travail HTTP 409 est classe `browser_required` plutot que `needs_review`: c'est un blocage navigateur/anti-bot attendu sur `candidat.francetravail.fr`, pas une offre a retraiter automatiquement.
+- Augments cibles executes: 242 offres watch/VIE techniques puis 188 VIE restants, tous a 0 fallback. Resultat: lane VIE entierement jugee et `unjudged_watch_queue` vide.
+- Audit rescue execute sur deux poches non-VIE au titre/source: 140 puis 163 offres, tous a 0 fallback. Resultat: **16** nouveaux `apply_now`, **70** `shortlist`.
+- Audit manuel/residuel ajoute ensuite 120 + 120 + 120 + 80 + 160 + 80 + 120 offres sur les borderlines, doctorats/LLM, entreprises sensibles, exceptions et residuels stricts: **27** `apply_now`, **190** `shortlist`, **220** `maybe`, **363** `skip`, 0 fallback.
+- Dernieres passes residual6/residual7: residual6 a prouve que l'ancien libelle `2856 bruits` etait trop fort (**4** `apply_now`, **11** `shortlist` sur 80); residual7 a juge 120 autres suspects et n'a trouve que **14** `shortlist`, **0** `apply_now`. Resultat: **0** VIE-like non juge restant et **0** bucket A/B actionnable parmi les **2760** non juges restants; il reste **271** weak-signal C et **2489** low-signal/noise.
 
 ## P0 A PN
 
 - `P0`: aucun blocage runtime detecte sur le dernier run.
-- `P1`: ouvrir manuellement les **206** liens `browser_required` avant candidature.
-- `P1`: verifier manuellement les **42** liens `needs_review` et le **1** `server_error` avant candidature.
+- `P1`: ouvrir manuellement les **570** liens `browser_required` avant candidature, surtout Indeed/JobSpy, France Travail HTTP 409 et pages protegees/anti-bot.
+- `P1`: verifier manuellement les **13** liens `expired`, les **2** `unreachable` et le **1** `server_error` si tu veux recuperer des offres hors queue. Il reste **0** `needs_review`.
 - `P1`: verifier salaire et remote quand l'offre ou le judge LLM marquent `unknown`/`weak`.
 - `P2`: utiliser `start_date_check` comme signal soft et confirmer avec RH les dates `unknown`/`too_soon`; ne pas auto-skipper.
 - `P2`: exploiter `vie_priority_queue.md` pour les VIE; la queue principale ne suffit pas a elle seule pour cette voie.
-- `P2`: utiliser `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux soft. Les hard filters legitimes restent: remote explicitement incompatible, langue locale obligatoire non compensee par un fit tres fort, ou niveau/experience `too_senior` sans signal junior/all-levels explicite.
+- `P2`: garder `unjudged_watch_queue.md` comme garde-fou de futurs runs; sur l'etat courant elle est vide, car Mistral Enterprise Agents/Applied AI, LangChain LangSmith, Poolside, DeepMind, Canonical Junior Observability, Cohere internship et les autres signaux detectes ont ete juges par l'augment cible.
+- `P2`: utiliser `deadline`, `language_check`, `remote_location_validity`, `required_years`, `experience_check` et `salary_normalized_annual_eur` comme signaux soft. Les hard filters legitimes restent: remote explicitement incompatible, langue locale obligatoire non compensee par un fit tres fort, ou niveau/experience `too_senior` sans override LLM `junior_ok`/`stretch` explicite.
 - `P2`: garder les candidatures/messages en validation humaine; aucune action LinkedIn automatique de masse.
 - `P2`: lancer ponctuellement `scripts/pull_web_state.ps1` pour sauvegarder localement les statuts/notes saisis dans l'interface.
 - `P3`: `JudgeConcurrency 2` peut etre reteste si codexlb change, mais le default prod reste 1 tant que les logs montrent des `queue_full` a concurrence elevee.
